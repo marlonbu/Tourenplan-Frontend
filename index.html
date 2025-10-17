@@ -4,11 +4,22 @@
   <meta charset="UTF-8">
   <title>Tourenplan Übersicht</title>
   <link rel="stylesheet" href="style.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    #map {
+      height: 400px;
+      width: 100%;
+      margin-bottom: 20px;
+    }
+  </style>
 </head>
 <body>
   <h1>🚚 Tourenübersicht</h1>
+  <div id="map">Lade Karte...</div>
   <div id="touren-container">Lade Touren...</div>
 
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
