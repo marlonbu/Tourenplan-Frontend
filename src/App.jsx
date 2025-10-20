@@ -1,217 +1,151 @@
-import React, { useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import React, { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import "./App.css";
 
-function App() {
-  const [fahrer, setFahrer] = useState("");
-  const [datum, setDatum] = useState("");
+// Standard Marker Icon fix
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+});
 
-  // Demo-Tourdaten
-  const demoTour = [
-    {
-      id: 1,
-      ankunftszeit: "08:30",
-      kunde: "Muster GmbH",
-      kommission: "KOM-123",
-      adresse: "Bahnhofstr. 12, 49699 Lindern",
-      anmerkung: "Anlieferung Seiteneingang",
-      lat: 52.843,
-      lng: 7.768,
-    },
-    {
-      id: 2,
-      ankunftszeit: "09:15",
-      kunde: "Test AG",
-      kommission: "KOM-456",
-      adresse: "Bremer Str. 45, 26122 Oldenburg",
-      anmerkung: "Ansprechpartner: Herr Meier",
-      lat: 53.143,
-      lng: 8.214,
-    },
-    {
-      id: 3,
-      ankunftszeit: "10:00",
-      kunde: "Beispiel OHG",
-      kommission: "KOM-789",
-      adresse: "Industriestr. 8, 49661 Cloppenburg",
-      anmerkung: "Bitte Lieferschein abstempeln",
-      lat: 52.85,
-      lng: 7.98,
-    },
-    {
-      id: 4,
-      ankunftszeit: "11:30",
-      kunde: "Kunde XY",
-      kommission: "KOM-101",
-      adresse: "Am Markt 5, 26203 Wardenburg",
-      anmerkung: "Hintereingang benutzen",
-      lat: 53.061,
-      lng: 8.198,
-    },
-  ];
+export default function App() {
+  const [fahrer, setFahrer] = useState([]);
+  const [selectedFahrer, setSelectedFahrer] = useState("");
+  const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
+  const [stopps, setStopps] = useState([]);
+  const [details, setDetails] = useState([]);
+  const [mapsLink, setMapsLink] = useState("");
 
-  const handleLoadTour = () => {
-    alert(`Tour geladen für Fahrer: ${fahrer} am ${datum}`);
-  };
+  // Fahrer laden
+  useEffect(() => {
+    fetch("https://tourenplan.onrender.com/fahrer")
+      .then((res) => res.json())
+      .then(setFahrer)
+      .catch(console.error);
+  }, []);
 
-  // Google Maps Route öffnen
-  const openGoogleMaps = () => {
-    if (demoTour.length === 0) return;
+  // Tourdaten laden
+  useEffect(() => {
+    if (selectedFahrer && datum) {
+      fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
+        .then((res) => res.json())
+        .then(setStopps)
+        .catch(console.error);
 
-    const origin = encodeURIComponent(demoTour[0].adresse);
-    const destination = encodeURIComponent(demoTour[demoTour.length - 1].adresse);
+      fetch(
+        `https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}/mapslink`
+      )
+        .then((res) => res.json())
+        .then((data) => setMapsLink(data.mapsLink || ""))
+        .catch(console.error);
 
-    const waypoints = demoTour
-      .slice(1, demoTour.length - 1)
-      .map((s) => encodeURIComponent(s.adresse))
-      .join("|");
-
-    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}`;
-
-    window.open(url, "_blank");
-  };
+      fetch("https://tourenplan.onrender.com/all")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.stopps) {
+            const ids = stopps.map((s) => s.stopp_id);
+            const filtered = data.stopps.filter((s) => ids.includes(s.id));
+            setDetails(filtered);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [selectedFahrer, datum]);
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">🚛 Tourenplan</h1>
+    <div className="app-container">
+      <header className="header">
+        <h1>🚚 Tourenplan Übersicht</h1>
       </header>
 
-      {/* Eingabe-Bereich */}
-      <div className="bg-white shadow-md rounded-lg p-6 max-w-6xl mx-auto mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-          {/* Fahrer-Auswahl */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Fahrer
-            </label>
-            <select
-              value={fahrer}
-              onChange={(e) => setFahrer(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            >
-              <option value="">-- bitte wählen --</option>
-              <option value="1">Christoph Arlt</option>
-              <option value="2">Hans Noll</option>
-              <option value="3">Johannes Backhaus</option>
-              <option value="4">Markus Honkomp</option>
-            </select>
-          </div>
+      <div className="controls">
+        <label>Fahrer: </label>
+        <select
+          value={selectedFahrer}
+          onChange={(e) => setSelectedFahrer(e.target.value)}
+        >
+          <option value="">-- Fahrer wählen --</option>
+          {fahrer.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
 
-          {/* Datum */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Datum
-            </label>
-            <input
-              type="date"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            />
-          </div>
-
-          {/* Button */}
-          <div className="flex items-end">
-            <button
-              onClick={handleLoadTour}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-md w-full"
-            >
-              Tour laden
-            </button>
-          </div>
-        </div>
+        <label>Datum: </label>
+        <input
+          type="date"
+          value={datum}
+          onChange={(e) => setDatum(e.target.value)}
+        />
       </div>
 
-      {/* Split-Screen Bereich */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-7xl mx-auto">
-        {/* Karte */}
-        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+      {stopps.length > 0 && (
+        <>
+          {/* Karte */}
           <MapContainer
-            center={[52.9, 8.0]}
-            zoom={9}
-            style={{ height: "500px", width: "100%" }}
+            center={[stopps[0].lat || 52.52, stopps[0].lng || 13.405]}
+            zoom={10}
+            style={{ height: "400px", width: "100%", marginBottom: "20px" }}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              attribution="© OpenStreetMap contributors"
             />
-            {demoTour.map((stopp) => (
-              <Marker key={stopp.id} position={[stopp.lat, stopp.lng]}>
+            {stopps.map((s, i) => (
+              <Marker key={i} position={[s.lat, s.lng]}>
                 <Popup>
-                  <b>{stopp.kunde}</b>
+                  <b>Stopp {i + 1}</b>
                   <br />
-                  {stopp.adresse}
-                  <br />
-                  ⏰ {stopp.ankunftszeit}
+                  {s.adresse}
                 </Popup>
               </Marker>
             ))}
+            <Polyline positions={stopps.map((s) => [s.lat, s.lng])} color="blue" />
           </MapContainer>
-        </div>
 
-        {/* Tabelle */}
-        <div className="bg-white shadow-md rounded-lg p-6 flex flex-col">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">Tourdaten</h2>
-          <div className="overflow-x-auto flex-grow">
-            <table className="w-full border-collapse border border-gray-200">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="border border-gray-200 px-3 py-2 text-left">
-                    Ankunftszeit
-                  </th>
-                  <th className="border border-gray-200 px-3 py-2 text-left">
-                    Kunde
-                  </th>
-                  <th className="border border-gray-200 px-3 py-2 text-left">
-                    Kommission
-                  </th>
-                  <th className="border border-gray-200 px-3 py-2 text-left">
-                    Adresse
-                  </th>
-                  <th className="border border-gray-200 px-3 py-2 text-left">
-                    Anmerkung
-                  </th>
+          {/* Tabelle */}
+          <h2>Tourdaten</h2>
+          <table className="tour-table">
+            <thead>
+              <tr>
+                <th>Ankunftszeit</th>
+                <th>Kunde</th>
+                <th>Kommission</th>
+                <th>Kundenadresse</th>
+                <th>Anmerkung</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stopps.map((s, i) => (
+                <tr key={i}>
+                  <td>{`${8 + i}:00`}</td>
+                  <td>{`Kunde ${i + 1}`}</td>
+                  <td>{`KOM-${100 + i}`}</td>
+                  <td>{s.adresse}</td>
+                  <td>{`Anmerkung ${i + 1}`}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {demoTour.map((stopp) => (
-                  <tr key={stopp.id} className="hover:bg-gray-50">
-                    <td className="border border-gray-200 px-3 py-2">
-                      {stopp.ankunftszeit}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2">
-                      {stopp.kunde}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2">
-                      {stopp.kommission}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2">
-                      {stopp.adresse}
-                    </td>
-                    <td className="border border-gray-200 px-3 py-2">
-                      {stopp.anmerkung}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
 
-          {/* Google Maps Button */}
-          <div className="mt-4 text-center">
-            <button
-              onClick={openGoogleMaps}
-              className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-md"
-            >
-              📍 Route in Google Maps öffnen
-            </button>
-          </div>
-        </div>
-      </div>
+          {/* Button → Google Maps */}
+          {mapsLink && (
+            <div className="maps-btn">
+              <a href={mapsLink} target="_blank" rel="noopener noreferrer">
+                ➡️ Route in Google Maps öffnen
+              </a>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
-
-export default App;
