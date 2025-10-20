@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import logo from "./assets/logo.png"; // Dein Firmenlogo (in src/assets/ ablegen)
 
 // Marker Icon Fix für Leaflet + Vite
 import L from "leaflet";
@@ -17,7 +16,7 @@ L.Icon.Default.mergeOptions({
 
 function App() {
   const [stopps, setStopps] = useState([]);
-  const fahrerId = 1; // Christoph Arlt
+  const fahrerId = 1; // Standard: Christoph Arlt
   const morgen = new Date();
   morgen.setDate(morgen.getDate() + 1);
   const datum = morgen.toISOString().slice(0, 10);
@@ -36,15 +35,15 @@ function App() {
       .slice(1, stopps.length - 1)
       .map(s => encodeURIComponent(s.adresse))
       .join("|");
+
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}`;
     window.open(url, "_blank");
   };
 
   return (
     <div style={{ fontFamily: "Arial, sans-serif", padding: "10px" }}>
-      {/* Header mit Logo */}
-      <header style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
-        <img src={logo} alt="Firmenlogo" style={{ height: "60px", marginRight: "15px" }} />
+      {/* Header ohne Logo */}
+      <header style={{ marginBottom: "10px", textAlign: "center" }}>
         <h1 style={{ margin: 0 }}>🚚 Tourenplan</h1>
       </header>
 
