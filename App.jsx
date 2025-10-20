@@ -2,9 +2,21 @@ import { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 
+// Marker Icon Fix für Leaflet + Vite
+import L from "leaflet";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
+
 function App() {
   const [stopps, setStopps] = useState([]);
-  const fahrerId = 1; // Christoph Arlt
+  const fahrerId = 1; // Standard: Christoph Arlt
   const morgen = new Date();
   morgen.setDate(morgen.getDate() + 1);
   const datum = morgen.toISOString().slice(0, 10);
