@@ -54,6 +54,23 @@ function App() {
     alert(`Tour geladen für Fahrer: ${fahrer} am ${datum}`);
   };
 
+  // Google Maps Route öffnen
+  const openGoogleMaps = () => {
+    if (demoTour.length === 0) return;
+
+    const origin = encodeURIComponent(demoTour[0].adresse);
+    const destination = encodeURIComponent(demoTour[demoTour.length - 1].adresse);
+
+    const waypoints = demoTour
+      .slice(1, demoTour.length - 1)
+      .map((s) => encodeURIComponent(s.adresse))
+      .join("|");
+
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}`;
+
+    window.open(url, "_blank");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* Header */}
@@ -135,11 +152,9 @@ function App() {
         </div>
 
         {/* Tabelle */}
-        <div className="bg-white shadow-md rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-gray-700 mb-4">
-            Tourdaten
-          </h2>
-          <div className="overflow-x-auto">
+        <div className="bg-white shadow-md rounded-lg p-6 flex flex-col">
+          <h2 className="text-lg font-semibold text-gray-700 mb-4">Tourdaten</h2>
+          <div className="overflow-x-auto flex-grow">
             <table className="w-full border-collapse border border-gray-200">
               <thead className="bg-gray-100">
                 <tr>
@@ -182,6 +197,16 @@ function App() {
                 ))}
               </tbody>
             </table>
+          </div>
+
+          {/* Google Maps Button */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={openGoogleMaps}
+              className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-md"
+            >
+              📍 Route in Google Maps öffnen
+            </button>
           </div>
         </div>
       </div>
