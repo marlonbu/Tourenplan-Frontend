@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet"
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "./App.css";
+import logo from "./assets/logo.png"; // Firmenlogo einbinden
 
 // Standard Marker Icon fix
 delete L.Icon.Default.prototype._getIconUrl;
@@ -20,7 +21,6 @@ export default function App() {
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
   const [stopps, setStopps] = useState([]);
-  const [details, setDetails] = useState([]);
   const [mapsLink, setMapsLink] = useState("");
 
   // Fahrer laden
@@ -31,7 +31,7 @@ export default function App() {
       .catch(console.error);
   }, []);
 
-  // Tourdaten laden
+  // Tourdaten + MapsLink laden
   useEffect(() => {
     if (selectedFahrer && datum) {
       fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
@@ -45,26 +45,18 @@ export default function App() {
         .then((res) => res.json())
         .then((data) => setMapsLink(data.mapsLink || ""))
         .catch(console.error);
-
-      fetch("https://tourenplan.onrender.com/all")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.stopps) {
-            const ids = stopps.map((s) => s.stopp_id);
-            const filtered = data.stopps.filter((s) => ids.includes(s.id));
-            setDetails(filtered);
-          }
-        })
-        .catch(console.error);
     }
   }, [selectedFahrer, datum]);
 
   return (
     <div className="app-container">
+      {/* Header mit Logo */}
       <header className="header">
+        <img src={logo} alt="Firmenlogo" className="logo" />
         <h1>🚚 Tourenplan Übersicht</h1>
       </header>
 
+      {/* Auswahlboxen */}
       <div className="controls">
         <label>Fahrer: </label>
         <select
