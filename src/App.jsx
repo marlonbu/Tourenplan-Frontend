@@ -14,7 +14,6 @@ function App() {
 
   const apiUrl = "https://tourenplan.onrender.com";
 
-  // Fahrer laden
   useEffect(() => {
     fetch(`${apiUrl}/fahrer`)
       .then((res) => res.json())
@@ -22,7 +21,6 @@ function App() {
       .catch((err) => console.error(err));
   }, []);
 
-  // Tour laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
@@ -42,13 +40,12 @@ function App() {
       });
   };
 
-  // 🚀 Demo neu laden (reset + seed)
   const resetUndSeed = async () => {
     try {
       setLoading(true);
       await fetch(`${apiUrl}/reset`);
       await fetch(`${apiUrl}/seed-demo`);
-      alert("✅ Demo-Daten wurden neu erstellt!");
+      alert("✅ Demo-Daten neu erstellt!");
       setTour([]);
       setSelectedFahrer("");
       setDatum("");
@@ -61,7 +58,6 @@ function App() {
     }
   };
 
-  // Routing + Karte
   useEffect(() => {
     if (tour.length > 1) {
       const map = L.map("map", {
@@ -73,7 +69,6 @@ function App() {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
       }).addTo(map);
 
-      // Marker setzen
       tour.forEach((stopp) => {
         L.marker([stopp.lat, stopp.lng], {
           icon: L.icon({
@@ -89,7 +84,6 @@ function App() {
           .bindPopup(stopp.adresse);
       });
 
-      // Routing ohne Turn-by-Turn Panel
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
@@ -109,7 +103,6 @@ function App() {
     }
   }, [tour]);
 
-  // Google Maps Link generieren
   const googleMapsLink = () => {
     if (tour.length === 0) return "#";
     let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
@@ -133,14 +126,12 @@ function App() {
     <div className="App">
       <h1>🚚 Tourenplan</h1>
 
-      {/* Reset Button */}
       <div className="controls">
         <button onClick={resetUndSeed} disabled={loading}>
           🔄 Demo neu laden
         </button>
       </div>
 
-      {/* Fahrer Auswahl */}
       <div className="controls">
         <select
           value={selectedFahrer}
@@ -164,14 +155,12 @@ function App() {
         </button>
       </div>
 
-      {/* Meldung wenn keine Tour */}
       {meldung && (
         <div style={{ marginTop: "20px", color: "red", fontWeight: "bold" }}>
           {meldung}
         </div>
       )}
 
-      {/* Tabelle */}
       {tour.length > 0 && (
         <table>
           <thead>
@@ -193,27 +182,25 @@ function App() {
                 <td>{stopp.adresse}</td>
                 <td>{stopp.anmerkung || "-"}</td>
                 <td>
-                  {stopp.erledigt ? (
-                    "✅"
-                  ) : (
-                    <input
-                      type="checkbox"
-                      onChange={async () => {
-                        try {
-                          await fetch(`${apiUrl}/scan`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ stopp_id: stopp.stopp_id }),
-                          });
-                          const updatedTour = [...tour];
-                          updatedTour[i].erledigt = true;
-                          setTour(updatedTour);
-                        } catch (err) {
-                          console.error("Fehler beim Erledigen:", err);
-                        }
-                      }}
-                    />
-                  )}
+                  <input
+                    type="checkbox"
+                    checked={stopp.erledigt}
+                    onChange={async () => {
+                      try {
+                        const res = await fetch(`${apiUrl}/scan`, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ stopp_id: stopp.stopp_id }),
+                        });
+                        const data = await res.json();
+                        const updatedTour = [...tour];
+                        updatedTour[i].erledigt = data.erledigt;
+                        setTour(updatedTour);
+                      } catch (err) {
+                        console.error("Fehler beim Umschalten:", err);
+                      }
+                    }}
+                  />
                 </td>
               </tr>
             ))}
@@ -221,7 +208,6 @@ function App() {
         </table>
       )}
 
-      {/* Karte */}
       {tour.length > 0 && (
         <>
           <div
@@ -233,8 +219,6 @@ function App() {
               borderRadius: "12px",
             }}
           ></div>
-
-          {/* Google Maps Button */}
           <div style={{ marginTop: "20px" }}>
             <a href={googleMapsLink()} target="_blank" rel="noopener noreferrer">
               <button style={{ padding: "10px 20px", fontSize: "16px" }}>
