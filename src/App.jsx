@@ -1,67 +1,57 @@
-import React, { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-import "./App.css";
-import logo from "./assets/logo.png"; // Firmenlogo einbinden
 
-// Standard Marker Icon fix
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
+const API_BASE = "https://tourenplan.onrender.com";
 
-export default function App() {
+function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
-  const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
-  const [stopps, setStopps] = useState([]);
-  const [mapsLink, setMapsLink] = useState("");
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0] // heutiges Datum
+  );
+  const [tourData, setTourData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Fahrer laden
   useEffect(() => {
-    fetch("https://tourenplan.onrender.com/fahrer")
+    fetch(`${API_BASE}/fahrer`)
       .then((res) => res.json())
-      .then(setFahrer)
-      .catch(console.error);
+      .then((data) => setFahrer(data))
+      .catch((err) => console.error("Fehler beim Laden der Fahrer:", err));
   }, []);
 
-  // Tourdaten + MapsLink laden
-  useEffect(() => {
-    if (selectedFahrer && datum) {
-      fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
-        .then((res) => res.json())
-        .then(setStopps)
-        .catch(console.error);
-
-      fetch(
-        `https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}/mapslink`
-      )
-        .then((res) => res.json())
-        .then((data) => setMapsLink(data.mapsLink || ""))
-        .catch(console.error);
+  // Tour laden
+  const loadTour = async () => {
+    if (!selectedFahrer || !selectedDate) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/touren/${selectedFahrer}/${selectedDate}`);
+      const data = await res.json();
+      setTourData(data);
+    } catch (err) {
+      console.error("Fehler beim Laden der Tour:", err);
     }
-  }, [selectedFahrer, datum]);
+    setLoading(false);
+  };
+
+  // Google Maps Link erstellen
+  const getGoogleMapsLink = () => {
+    if (!tourData || tourData.length === 0) return "#";
+    const coords = tourData.map((s) => `${s.lat},${s.lng}`).join("/");
+    return `https://www.google.com/maps/dir/${coords}`;
+  };
 
   return (
-    <div className="app-container">
-      {/* Header mit Logo */}
-      <header className="header">
-        <img src={logo} alt="Firmenlogo" className="logo" />
-        <h1>🚚 Tourenplan Übersicht</h1>
-      </header>
+    <div className="p-6 font-sans">
+      <h1 className="text-2xl font-bold mb-4">🚚 Tourenplan</h1>
 
-      {/* Auswahlboxen */}
-      <div className="controls">
-        <label>Fahrer: </label>
+      {/* Auswahl */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
         <select
           value={selectedFahrer}
           onChange={(e) => setSelectedFahrer(e.target.value)}
+          className="border p-2 rounded"
         >
           <option value="">-- Fahrer wählen --</option>
           {fahrer.map((f) => (
@@ -71,73 +61,97 @@ export default function App() {
           ))}
         </select>
 
-        <label>Datum: </label>
         <input
           type="date"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="border p-2 rounded"
         />
+
+        <button
+          onClick={loadTour}
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Tour laden
+        </button>
       </div>
 
-      {stopps.length > 0 && (
-        <>
-          {/* Karte */}
-          <MapContainer
-            center={[stopps[0].lat || 52.52, stopps[0].lng || 13.405]}
-            zoom={10}
-            style={{ height: "400px", width: "100%", marginBottom: "20px" }}
-          >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="© OpenStreetMap contributors"
-            />
-            {stopps.map((s, i) => (
-              <Marker key={i} position={[s.lat, s.lng]}>
-                <Popup>
-                  <b>Stopp {i + 1}</b>
-                  <br />
-                  {s.adresse}
-                </Popup>
-              </Marker>
-            ))}
-            <Polyline positions={stopps.map((s) => [s.lat, s.lng])} color="blue" />
-          </MapContainer>
+      {/* Tourdaten */}
+      {loading && <p>⏳ Lade Tourdaten...</p>}
 
-          {/* Tabelle */}
-          <h2>Tourdaten</h2>
-          <table className="tour-table">
+      {!loading && tourData.length === 0 && (
+        <p className="text-gray-500">❌ Keine Tour gefunden für diesen Fahrer/Tag</p>
+      )}
+
+      {tourData.length > 0 && (
+        <div>
+          <h2 className="text-xl font-semibold mb-2">Tourübersicht</h2>
+          <table className="w-full border mb-4">
             <thead>
-              <tr>
-                <th>Ankunftszeit</th>
-                <th>Kunde</th>
-                <th>Kommission</th>
-                <th>Kundenadresse</th>
-                <th>Anmerkung</th>
+              <tr className="bg-gray-200">
+                <th className="border px-2 py-1">Reihenfolge</th>
+                <th className="border px-2 py-1">Adresse</th>
+                <th className="border px-2 py-1">Erledigt</th>
               </tr>
             </thead>
             <tbody>
-              {stopps.map((s, i) => (
-                <tr key={i}>
-                  <td>{`${8 + i}:00`}</td>
-                  <td>{`Kunde ${i + 1}`}</td>
-                  <td>{`KOM-${100 + i}`}</td>
-                  <td>{s.adresse}</td>
-                  <td>{`Anmerkung ${i + 1}`}</td>
+              {tourData.map((stopp) => (
+                <tr key={stopp.stopp_id}>
+                  <td className="border px-2 py-1">{stopp.reihenfolge}</td>
+                  <td className="border px-2 py-1">{stopp.adresse}</td>
+                  <td className="border px-2 py-1">
+                    {stopp.erledigt ? "✅" : "❌"}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
 
-          {/* Button → Google Maps */}
-          {mapsLink && (
-            <div className="maps-btn">
-              <a href={mapsLink} target="_blank" rel="noopener noreferrer">
-                ➡️ Route in Google Maps öffnen
-              </a>
-            </div>
-          )}
-        </>
+          {/* Karte */}
+          <MapContainer
+            center={[tourData[0].lat || 51.1657, tourData[0].lng || 10.4515]} // Fallback: Deutschland
+            zoom={10}
+            style={{ height: "500px", width: "100%" }}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; OpenStreetMap-Mitwirkende"
+            />
+            {tourData
+              .filter((s) => s.lat && s.lng)
+              .map((stopp, idx) => (
+                <Marker key={idx} position={[stopp.lat, stopp.lng]}>
+                  <Popup>
+                    <b>Adresse:</b> {stopp.adresse}
+                    <br />
+                    <b>Reihenfolge:</b> {stopp.reihenfolge}
+                  </Popup>
+                </Marker>
+              ))}
+
+            {/* Route */}
+            <Polyline
+              positions={tourData
+                .filter((s) => s.lat && s.lng)
+                .map((s) => [s.lat, s.lng])}
+              color="blue"
+            />
+          </MapContainer>
+
+          <div className="mt-4">
+            <a
+              href={getGoogleMapsLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              ➡️ Route in Google Maps öffnen
+            </a>
+          </div>
+        </div>
       )}
     </div>
   );
 }
+
+export default App;
