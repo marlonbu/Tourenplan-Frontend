@@ -1,20 +1,8 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
-
-// --- Marker-Fix: sorgt dafür, dass die blauen Leaflet-Pins korrekt geladen werden ---
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -24,10 +12,6 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const apiUrl = "https://tourenplan.onrender.com";
-
-  // Leaflet-Refs, damit wir Map & Routing sauber aufräumen können
-  const mapRef = useRef(null);
-  const routingRef = useRef(null);
 
   // Fahrer laden
   useEffect(() => {
@@ -53,7 +37,7 @@ function App() {
       });
   };
 
-  // Demo neu laden
+  // 🚀 Demo neu laden (reset + seed)
   const resetUndSeed = async () => {
     try {
       setLoading(true);
@@ -63,15 +47,6 @@ function App() {
       setTour([]);
       setSelectedFahrer("");
       setDatum("");
-      // Karte aufräumen, falls sie offen war
-      if (routingRef.current) {
-        routingRef.current.remove();
-        routingRef.current = null;
-      }
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
     } catch (err) {
       console.error("Fehler beim Reset/Seed:", err);
       alert("❌ Fehler beim Demo-Neuladen");
@@ -80,25 +55,13 @@ function App() {
     }
   };
 
-  // Karte & Routing aufbauen, wenn Tour vorhanden
+  // Routing + Karte
   useEffect(() => {
-    // vorherige Instanzen sauber entfernen
-    if (routingRef.current) {
-      routingRef.current.remove();
-      routingRef.current = null;
-    }
-    if (mapRef.current) {
-      mapRef.current.remove();
-      mapRef.current = null;
-    }
-
     if (tour.length > 1) {
-      // Map erstellen
       const map = L.map("map", {
         center: [tour[0].lat, tour[0].lng],
         zoom: 10,
       });
-      mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
@@ -106,47 +69,62 @@ function App() {
 
       // Marker setzen
       tour.forEach((stopp) => {
-        L.marker([stopp.lat, stopp.lng]).addTo(map).bindPopup(stopp.adresse);
+        L.marker([stopp.lat, stopp.lng], {
+          icon: L.icon({
+            iconUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+            shadowUrl:
+              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+          }),
+        })
+          .addTo(map)
+          .bindPopup(stopp.adresse);
       });
 
-      // Routing hinzufügen
-      const routing = L.Routing.control({
+      // Routing ohne Turn-by-Turn Panel
+      L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
         lineOptions: { styles: [{ color: "red", weight: 4 }] },
-        createMarker: (i, wp) => L.marker(wp.latLng).bindPopup(tour[i].adresse),
+        createMarker: (i, wp) => {
+          return L.marker(wp.latLng).bindPopup(tour[i].adresse);
+        },
       })
-        .on("routeselected", () => {
-          // Panel (Turn-by-Turn) zuverlässig weg
-          const panel = document.querySelector(".leaflet-routing-container");
-          if (panel) panel.style.display = "none";
+        .on("routeselected", function () {
+          const container = document.querySelector(".leaflet-routing-container");
+          if (container) container.style.display = "none";
         })
         .addTo(map);
-
-      routingRef.current = routing;
-
-      // Falls das Panel noch später gerendert wird: nachträglich entfernen
-      setTimeout(() => {
-        const panel = document.querySelector(".leaflet-routing-container");
-        if (panel) panel.style.display = "none";
-      }, 200);
     }
-
-    // Cleanup, wenn Komponente unmountet oder Tour wechselt
-    return () => {
-      if (routingRef.current) {
-        routingRef.current.remove();
-        routingRef.current = null;
-      }
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
   }, [tour]);
+
+  // Google Maps Link generieren
+  const googleMapsLink = () => {
+    if (tour.length === 0) return "#";
+    // Erstes Ziel als Start
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      tour[0].adresse
+    )}`;
+    // Letztes Ziel als Destination
+    url += `&destination=${encodeURIComponent(
+      tour[tour.length - 1].adresse
+    )}`;
+    // Zwischenstopps
+    if (tour.length > 2) {
+      const waypoints = tour
+        .slice(1, -1)
+        .map((s) => encodeURIComponent(s.adresse))
+        .join("|");
+      url += `&waypoints=${waypoints}`;
+    }
+    url += "&travelmode=driving";
+    return url;
+  };
 
   return (
     <div className="App">
@@ -211,17 +189,30 @@ function App() {
 
       {/* Karte */}
       {tour.length > 0 && (
-        <div
-          id="map"
-          style={{
-            height: "600px",
-            width: "100%",
-            marginTop: "20px",
-            borderRadius: "12px",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            overflow: "hidden",
-          }}
-        />
+        <>
+          <div
+            id="map"
+            style={{
+              height: "500px",
+              width: "100%",
+              marginTop: "20px",
+              borderRadius: "12px",
+            }}
+          ></div>
+
+          {/* Google Maps Button */}
+          <div style={{ marginTop: "20px" }}>
+            <a
+              href={googleMapsLink()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <button style={{ padding: "10px 20px", fontSize: "16px" }}>
+                ➡️ Route in Google Maps öffnen
+              </button>
+            </a>
+          </div>
+        </>
       )}
     </div>
   );
