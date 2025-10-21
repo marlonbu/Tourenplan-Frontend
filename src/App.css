@@ -1,37 +1,92 @@
-.App {
+/* App.css */
+
+/* Allgemeines Layout */
+body {
+  margin: 0;
   font-family: Arial, sans-serif;
+  background-color: #f9f9f9;
+  color: #333;
+}
+
+.App {
+  max-width: 1200px;
+  margin: auto;
   padding: 20px;
-  max-width: 1000px;
-  margin: 0 auto;
+  text-align: center;
 }
 
 h1 {
+  margin-bottom: 20px;
+  color: #2c3e50;
+}
+
+/* Login-Container */
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   text-align: center;
+}
+
+.login-container h2 {
   margin-bottom: 20px;
 }
 
-.controls {
-  margin: 10px 0;
-  display: flex;
-  justify-content: center;
-  gap: 10px;
+.login-container input {
+  width: 80%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
-button {
-  padding: 8px 16px;
+.login-container button {
+  padding: 10px 20px;
+  background-color: #3498db;
   border: none;
-  background-color: #007bff;
+  border-radius: 8px;
   color: white;
-  border-radius: 5px;
+  font-size: 14px;
   cursor: pointer;
+  transition: background 0.3s ease;
 }
 
-button:disabled {
-  background-color: #ccc;
+.login-container button:hover {
+  background-color: #2980b9;
 }
 
-button:hover:not(:disabled) {
-  background-color: #0056b3;
+/* Controls (Buttons, Dropdowns) */
+.controls {
+  margin: 15px 0;
+}
+
+.controls button {
+  padding: 8px 16px;
+  margin: 0 5px;
+  background-color: #3498db;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.controls button:hover {
+  background-color: #2980b9;
+}
+
+.controls select,
+.controls input[type="date"] {
+  padding: 8px;
+  margin: 0 5px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
 }
 
 /* Tabelle */
@@ -39,30 +94,35 @@ table {
   width: 100%;
   border-collapse: collapse;
   margin-top: 20px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 th,
 td {
-  border: 1px solid #ccc;
-  padding: 10px;
-  text-align: center;
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
 }
 
-/* Zebra-Streifen */
-tbody tr:nth-child(even) {
+th {
+  background-color: #3498db;
+  color: white;
+}
+
+tr:nth-child(even) {
   background-color: #f9f9f9;
 }
 
-/* Status-Spalte speziell */
-td:last-child {
-  font-size: 18px;
-  font-weight: bold;
-  text-align: center;
-  vertical-align: middle;
+tr:hover {
+  background-color: #eef6fc;
 }
 
-/* Checkbox Styling */
-input[type="checkbox"] {
-  transform: scale(1.3);
-  cursor: pointer;
+/* Karte */
+#map {
+  border-radius: 12px;
+  margin-top: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
