@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "leaflet-routing-machine";
@@ -25,7 +25,21 @@ function App() {
 
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
-      .then((data) => setTour(data))
+      .then((data) => {
+        // Dummy-Daten hinzufügen
+        const kunden = ["Müller GmbH", "Schmidt AG", "Bäckerei Weber", "Kaufland"];
+        const anmerkungen = ["Bitte hinten anliefern", "Direkt beim Kunden", "Vorsicht Glas", "Lagerhalle"];
+
+        const erweitert = data.map((stopp, idx) => ({
+          ...stopp,
+          kunde: kunden[idx % kunden.length],
+          kommission: `KOMM-${100 + idx}`,
+          anmerkung: anmerkungen[idx % anmerkungen.length],
+          ankunftszeit: `${String(8 + idx).padStart(2, "0")}:00`
+        }));
+
+        setTour(erweitert);
+      })
       .catch((err) => console.error("Fehler beim Laden der Tour:", err));
   };
 
@@ -60,7 +74,7 @@ function App() {
         draggableWaypoints: false,
         createMarker: function (i, wp, nWps) {
           return L.marker(wp.latLng).bindPopup(
-            `<b>${tour[i].kunde || "Unbekannt"}</b><br/>${tour[i].adresse}`
+            `<b>${tour[i].kunde}</b><br/>${tour[i].adresse}<br/>${tour[i].ankunftszeit}`
           );
         },
       }).addTo(map);
@@ -68,6 +82,13 @@ function App() {
       map._routingControl = routingControl;
     }
   }, [tour]);
+
+  // Google Maps Route-Link bauen
+  const getGoogleMapsLink = () => {
+    if (tour.length === 0) return "#";
+    const coords = tour.map((s) => `${s.lat},${s.lng}`).join("/");
+    return `https://www.google.com/maps/dir/${coords}`;
+  };
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
@@ -113,7 +134,7 @@ function App() {
             width: "100%",
             borderCollapse: "collapse",
             textAlign: "left",
-            marginBottom: "30px",
+            marginBottom: "20px",
           }}
         >
           <thead>
@@ -130,17 +151,17 @@ function App() {
           <tbody>
             {tour.map((stopp, index) => (
               <tr
-                key={stopp.id}
+                key={stopp.stopp_id || index}
                 style={{
                   backgroundColor: index % 2 === 0 ? "#ffffff" : "#f9f9f9",
                 }}
               >
                 <td style={tdStyle}>{index + 1}</td>
                 <td style={tdStyle}>{formatTime(stopp.ankunftszeit)}</td>
-                <td style={tdStyle}>{stopp.kunde || "-"}</td>
-                <td style={tdStyle}>{stopp.kommission || "-"}</td>
-                <td style={tdStyle}>{stopp.adresse || "-"}</td>
-                <td style={tdStyle}>{stopp.anmerkung || "-"}</td>
+                <td style={tdStyle}>{stopp.kunde}</td>
+                <td style={tdStyle}>{stopp.kommission}</td>
+                <td style={tdStyle}>{stopp.adresse}</td>
+                <td style={tdStyle}>{stopp.anmerkung}</td>
                 <td style={tdStyle}>{stopp.erledigt ? "✅" : "❌"}</td>
               </tr>
             ))}
@@ -148,6 +169,27 @@ function App() {
         </table>
       ) : (
         <p>Keine Tourdaten gefunden.</p>
+      )}
+
+      {/* Google Maps Button */}
+      {tour.length > 0 && (
+        <div style={{ marginBottom: "20px" }}>
+          <a
+            href={getGoogleMapsLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-block",
+              backgroundColor: "#28a745",
+              color: "white",
+              padding: "10px 20px",
+              borderRadius: "6px",
+              textDecoration: "none",
+            }}
+          >
+            ➡️ Route in Google Maps öffnen
+          </a>
+        </div>
       )}
 
       {/* Karte */}
