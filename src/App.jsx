@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "leaflet-routing-machine";
@@ -38,7 +37,7 @@ function App() {
       });
   };
 
-  // 🚀 Demo neu laden (reset + seed)
+  // Demo neu laden
   const resetUndSeed = async () => {
     try {
       setLoading(true);
@@ -77,6 +76,7 @@ function App() {
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
+        show: false, // 🚀 Panel wird deaktiviert
       }).addTo(map);
     }
   }, [tour]);
