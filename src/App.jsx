@@ -1,241 +1,153 @@
-import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
-import L from "leaflet";
+import React, { useState, useEffect } from "react";
+import "./App.css";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
 import "leaflet-routing-machine";
-import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
-
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl:
-    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
-});
-
-// Routing-Komponente
-function RoutingMachine({ waypoints }) {
-  const map = useMap();
-  useEffect(() => {
-    if (!map) return;
-    const validWaypoints = waypoints.filter(
-      (w) =>
-        w.lat !== null &&
-        w.lng !== null &&
-        !isNaN(w.lat) &&
-        !isNaN(w.lng)
-    );
-    if (validWaypoints.length < 2) return;
-
-    const routingControl = L.Routing.control({
-      waypoints: validWaypoints.map((w) => L.latLng(w.lat, w.lng)),
-      lineOptions: { styles: [{ color: "#0077ff", weight: 5 }] },
-      show: false,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      routeWhileDragging: false,
-    }).addTo(map);
-
-    return () => map.removeControl(routingControl);
-  }, [map, waypoints]);
-
-  return null;
-}
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
-  const [tourdaten, setTourdaten] = useState([]);
   const [datum, setDatum] = useState("");
+  const [tour, setTour] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const apiUrl = "https://tourenplan.onrender.com";
 
   // Fahrer laden
   useEffect(() => {
-    fetch("https://tourenplan.onrender.com/fahrer")
+    fetch(`${apiUrl}/fahrer`)
       .then((res) => res.json())
-      .then((data) => setFahrer(data))
+      .then(setFahrer)
       .catch((err) => console.error(err));
   }, []);
 
   // Tour laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
-    fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
+    setLoading(true);
+    fetch(`${apiUrl}/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
-      .then((data) => setTourdaten(data))
-      .catch((err) => console.error(err));
+      .then((data) => {
+        setTour(data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setLoading(false);
+      });
   };
 
-  // Google Maps Button
-  const openInGoogleMaps = () => {
-    if (tourdaten.length === 0) return;
-    const valid = tourdaten.filter(
-      (s) =>
-        s.lat !== null &&
-        s.lng !== null &&
-        !isNaN(s.lat) &&
-        !isNaN(s.lng)
-    );
-    if (valid.length === 0) return;
-    const base = "https://www.google.com/maps/dir/";
-    const coords = valid.map((s) => `${s.lat},${s.lng}`).join("/");
-    window.open(base + coords, "_blank");
+  // 🚀 Demo neu laden (reset + seed)
+  const resetUndSeed = async () => {
+    try {
+      setLoading(true);
+      await fetch(`${apiUrl}/reset`);
+      await fetch(`${apiUrl}/seed-demo`);
+      alert("✅ Demo-Daten wurden neu erstellt!");
+      setTour([]);
+      setSelectedFahrer("");
+      setDatum("");
+    } catch (err) {
+      console.error("Fehler beim Reset/Seed:", err);
+      alert("❌ Fehler beim Demo-Neuladen");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Routing in Karte einbauen
+  useEffect(() => {
+    if (tour.length > 1) {
+      const map = L.map("map", {
+        center: [tour[0].lat, tour[0].lng],
+        zoom: 10,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
+      }).addTo(map);
+
+      tour.forEach((stopp) => {
+        L.marker([stopp.lat, stopp.lng])
+          .addTo(map)
+          .bindPopup(stopp.adresse);
+      });
+
+      L.Routing.control({
+        waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
+        routeWhileDragging: false,
+      }).addTo(map);
+    }
+  }, [tour]);
 
   return (
-    <div style={{ fontFamily: "Arial, sans-serif", padding: "20px" }}>
-      <h1 style={{ marginBottom: "20px" }}>🚚 Tourenplan</h1>
+    <div className="App">
+      <h1>🚚 Tourenplan</h1>
+
+      {/* Reset Button */}
+      <div className="controls">
+        <button onClick={resetUndSeed} disabled={loading}>
+          🔄 Demo neu laden
+        </button>
+      </div>
 
       {/* Fahrer Auswahl */}
-      <div style={{ marginBottom: "15px" }}>
-        <label>Fahrer: </label>
+      <div className="controls">
         <select
           value={selectedFahrer}
           onChange={(e) => setSelectedFahrer(e.target.value)}
         >
-          <option value="">-- bitte wählen --</option>
+          <option value="">Fahrer auswählen</option>
           {fahrer.map((f) => (
             <option key={f.id} value={f.id}>
               {f.name}
             </option>
           ))}
         </select>
-      </div>
 
-      {/* Datum Auswahl */}
-      <div style={{ marginBottom: "15px" }}>
-        <label>Datum: </label>
         <input
           type="date"
           value={datum}
           onChange={(e) => setDatum(e.target.value)}
         />
-        <button
-          onClick={ladeTour}
-          style={{
-            marginLeft: "10px",
-            padding: "5px 10px",
-            background: "#0077ff",
-            color: "#fff",
-            border: "none",
-            cursor: "pointer",
-          }}
-        >
+        <button onClick={ladeTour} disabled={loading}>
           Laden
         </button>
       </div>
 
-      {/* Tabelle mit echten DB-Feldern */}
-      {tourdaten.length > 0 && (
-        <table
-          style={{
-            width: "100%",
-            borderCollapse: "collapse",
-            marginBottom: "20px",
-          }}
-        >
+      {/* Tabelle */}
+      {tour.length > 0 && (
+        <table>
           <thead>
-            <tr style={{ background: "#f2f2f2" }}>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Reihenfolge
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Ankunftszeit
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Kunde
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Kommission
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Kundenadresse
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Anmerkung
-              </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Erledigt
-              </th>
+            <tr>
+              <th>Ankunftszeit</th>
+              <th>Kunde</th>
+              <th>Kommission</th>
+              <th>Adresse</th>
+              <th>Anmerkung</th>
             </tr>
           </thead>
           <tbody>
-            {tourdaten.map((stopp, idx) => (
-              <tr
-                key={stopp.stopp_id}
-                style={{ background: idx % 2 === 0 ? "#fff" : "#f9f9f9" }}
-              >
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.reihenfolge}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.ankunftszeit || "-"}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.kunde || "-"}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.kommission || "-"}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.adresse}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.anmerkung || "-"}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.erledigt ? "✅" : "❌"}
-                </td>
+            {tour.map((stopp, i) => (
+              <tr key={i}>
+                <td>{stopp.ankunftszeit || "08:00"}</td>
+                <td>{stopp.kunde || `Kunde ${i + 1}`}</td>
+                <td>{stopp.kommission || `KOM-${1000 + i}`}</td>
+                <td>{stopp.adresse}</td>
+                <td>{stopp.anmerkung || "-"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
 
-      {/* Google Maps Button */}
-      {tourdaten.length > 0 && (
-        <button
-          onClick={openInGoogleMaps}
-          style={{
-            padding: "10px 15px",
-            background: "#34A853",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-            marginBottom: "20px",
-          }}
-        >
-          ➡️ Route in Google Maps öffnen
-        </button>
-      )}
-
       {/* Karte */}
-      {tourdaten.length > 0 && (
-        <MapContainer
-          center={[tourdaten[0].lat, tourdaten[0].lng]}
-          zoom={10}
-          style={{ height: "500px", width: "100%" }}
-        >
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution="&copy; OpenStreetMap contributors"
-          />
-          {tourdaten
-            .filter((s) => s.lat && s.lng)
-            .map((stopp) => (
-              <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
-                <Popup>
-                  <b>{stopp.kunde}</b> <br />
-                  {stopp.adresse} <br />
-                  {stopp.kommission} <br />
-                  {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
-                </Popup>
-              </Marker>
-            ))}
-          <RoutingMachine waypoints={tourdaten} />
-        </MapContainer>
+      {tour.length > 0 && (
+        <div
+          id="map"
+          style={{ height: "500px", width: "100%", marginTop: "20px" }}
+        ></div>
       )}
     </div>
   );
