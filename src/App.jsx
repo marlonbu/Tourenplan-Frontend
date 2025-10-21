@@ -14,6 +14,7 @@ function App() {
 
   const apiUrl = "https://tourenplan.onrender.com";
 
+  // Fahrer laden
   useEffect(() => {
     fetch(`${apiUrl}/fahrer`)
       .then((res) => res.json())
@@ -21,6 +22,7 @@ function App() {
       .catch((err) => console.error(err));
   }, []);
 
+  // Tour laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
@@ -28,61 +30,22 @@ function App() {
     fetch(`${apiUrl}/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.length === 0) {
-          setMeldung("⚠️ Für diesen Fahrer gibt es an diesem Datum keine Tour.");
-        }
+        if (data.length === 0) setMeldung("⚠️ Für diesen Fahrer gibt es an diesem Datum keine Tour.");
         setTour(data);
-        setLoading(false);
       })
-      .catch((err) => {
-        console.error(err);
-        setLoading(false);
-      });
+      .catch(console.error)
+      .finally(() => setLoading(false));
   };
 
-  const resetUndSeed = async () => {
-    try {
-      setLoading(true);
-      await fetch(`${apiUrl}/reset`);
-      await fetch(`${apiUrl}/seed-demo`);
-      alert("✅ Demo-Daten neu erstellt!");
-      setTour([]);
-      setSelectedFahrer("");
-      setDatum("");
-      setMeldung("");
-    } catch (err) {
-      console.error("Fehler beim Reset/Seed:", err);
-      alert("❌ Fehler beim Demo-Neuladen");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Routing + Karte
   useEffect(() => {
     if (tour.length > 1) {
-      const map = L.map("map", {
-        center: [tour[0].lat, tour[0].lng],
-        zoom: 10,
-      });
-
+      const map = L.map("map", { center: [tour[0].lat, tour[0].lng], zoom: 10 });
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
       }).addTo(map);
 
-      tour.forEach((stopp) => {
-        L.marker([stopp.lat, stopp.lng], {
-          icon: L.icon({
-            iconUrl:
-              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-            shadowUrl:
-              "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-          }),
-        })
-          .addTo(map)
-          .bindPopup(stopp.adresse);
-      });
+      tour.forEach((stopp) => L.marker([stopp.lat, stopp.lng]).addTo(map).bindPopup(stopp.adresse));
 
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
@@ -91,31 +54,34 @@ function App() {
         draggableWaypoints: false,
         fitSelectedRoutes: true,
         lineOptions: { styles: [{ color: "red", weight: 4 }] },
-        createMarker: (i, wp) => {
-          return L.marker(wp.latLng).bindPopup(tour[i].adresse);
-        },
       })
-        .on("routeselected", function () {
-          const container = document.querySelector(".leaflet-routing-container");
-          if (container) container.style.display = "none";
+        .on("routeselected", () => {
+          const c = document.querySelector(".leaflet-routing-container");
+          if (c) c.style.display = "none";
         })
         .addTo(map);
+
+      return () => map.remove();
     }
   }, [tour]);
 
+  // PATCH Helfer (Speichern von Hinweis/Status)
+  const patchStopp = async (stoppId, body) => {
+    const res = await fetch(`${apiUrl}/stopps/${stoppId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+
+  // Google Maps Link
   const googleMapsLink = () => {
     if (tour.length === 0) return "#";
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
-      tour[0].adresse
-    )}`;
-    url += `&destination=${encodeURIComponent(
-      tour[tour.length - 1].adresse
-    )}`;
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(tour[0].adresse)}`;
+    url += `&destination=${encodeURIComponent(tour[tour.length - 1].adresse)}`;
     if (tour.length > 2) {
-      const waypoints = tour
-        .slice(1, -1)
-        .map((s) => encodeURIComponent(s.adresse))
-        .join("|");
+      const waypoints = tour.slice(1, -1).map((s) => encodeURIComponent(s.adresse)).join("|");
       url += `&waypoints=${waypoints}`;
     }
     url += "&travelmode=driving";
@@ -126,41 +92,23 @@ function App() {
     <div className="App">
       <h1>🚚 Tourenplan</h1>
 
+      {/* Auswahl */}
       <div className="controls">
-        <button onClick={resetUndSeed} disabled={loading}>
-          🔄 Demo neu laden
-        </button>
-      </div>
-
-      <div className="controls">
-        <select
-          value={selectedFahrer}
-          onChange={(e) => setSelectedFahrer(e.target.value)}
-        >
+        <select value={selectedFahrer} onChange={(e) => setSelectedFahrer(e.target.value)}>
           <option value="">Fahrer auswählen</option>
           {fahrer.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
+            <option key={f.id} value={f.id}>{f.name}</option>
           ))}
         </select>
 
-        <input
-          type="date"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
-        />
-        <button onClick={ladeTour} disabled={loading}>
-          Laden
-        </button>
+        <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        <button onClick={ladeTour} disabled={loading}>Laden</button>
       </div>
 
-      {meldung && (
-        <div style={{ marginTop: "20px", color: "red", fontWeight: "bold" }}>
-          {meldung}
-        </div>
-      )}
+      {/* Meldung */}
+      {meldung && <div style={{ marginTop: 10, color: "red", fontWeight: "bold" }}>{meldung}</div>}
 
+      {/* Tabelle */}
       {tour.length > 0 && (
         <table>
           <thead>
@@ -169,36 +117,70 @@ function App() {
               <th>Kunde</th>
               <th>Kommission</th>
               <th>Adresse</th>
-              <th>Anmerkung</th>
-              <th>Status</th>
+              <th>Telefon</th>
+              <th>Hinweis</th>
+              <th>Status (Text)</th>
+              <th>Erledigt</th>
             </tr>
           </thead>
           <tbody>
-            {tour.map((stopp, i) => (
-              <tr key={i}>
-                <td>{stopp.ankunftszeit || "08:00"}</td>
-                <td>{stopp.kunde || `Kunde ${i + 1}`}</td>
-                <td>{stopp.kommission || `KOM-${1000 + i}`}</td>
-                <td>{stopp.adresse}</td>
-                <td>{stopp.anmerkung || "-"}</td>
+            {tour.map((s, i) => (
+              <tr key={s.stopp_id}>
+                <td>{s.ankunftszeit || "08:00"}</td>
+                <td>{s.kunde || `Kunde ${i + 1}`}</td>
+                <td>{s.kommission || `KOM-${1000 + i}`}</td>
+                <td>{s.adresse}</td>
+
+                {/* Telefon klickbar */}
+                <td>{s.telefon ? <a href={`tel:${s.telefon.replace(/\s+/g, "")}`}>{s.telefon}</a> : "-"}</td>
+
+                {/* Hinweis editierbar */}
+                <td>
+                  <input
+                    type="text"
+                    defaultValue={s.hinweis || ""}
+                    placeholder="Hinweis…"
+                    onBlur={async (e) => {
+                      const updated = await patchStopp(s.stopp_id, { hinweis: e.target.value });
+                      const copy = [...tour];
+                      copy[i] = { ...copy[i], hinweis: updated.hinweis };
+                      setTour(copy);
+                    }}
+                    style={{ width: 180 }}
+                  />
+                </td>
+
+                {/* Status-Text editierbar */}
+                <td>
+                  <textarea
+                    defaultValue={s.status_text || ""}
+                    placeholder="Status/Fahrer-Notiz…"
+                    rows={2}
+                    onBlur={async (e) => {
+                      const updated = await patchStopp(s.stopp_id, { status_text: e.target.value });
+                      const copy = [...tour];
+                      copy[i] = { ...copy[i], status_text: updated.status_text };
+                      setTour(copy);
+                    }}
+                    style={{ width: 220 }}
+                  />
+                </td>
+
+                {/* Erledigt toggle */}
                 <td>
                   <input
                     type="checkbox"
-                    checked={stopp.erledigt}
+                    checked={!!s.erledigt}
                     onChange={async () => {
-                      try {
-                        const res = await fetch(`${apiUrl}/scan`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ stopp_id: stopp.stopp_id }),
-                        });
-                        const data = await res.json();
-                        const updatedTour = [...tour];
-                        updatedTour[i].erledigt = data.erledigt;
-                        setTour(updatedTour);
-                      } catch (err) {
-                        console.error("Fehler beim Umschalten:", err);
-                      }
+                      const r = await fetch(`${apiUrl}/scan`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ stopp_id: s.stopp_id }),
+                      });
+                      const data = await r.json();
+                      const copy = [...tour];
+                      copy[i] = { ...copy[i], erledigt: data.erledigt };
+                      setTour(copy);
                     }}
                   />
                 </td>
@@ -208,22 +190,13 @@ function App() {
         </table>
       )}
 
+      {/* Karte + GMaps Button */}
       {tour.length > 0 && (
         <>
-          <div
-            id="map"
-            style={{
-              height: "500px",
-              width: "100%",
-              marginTop: "20px",
-              borderRadius: "12px",
-            }}
-          ></div>
-          <div style={{ marginTop: "20px" }}>
+          <div id="map" style={{ height: "600px", width: "100%", marginTop: 20, borderRadius: 12 }} />
+          <div style={{ marginTop: 16 }}>
             <a href={googleMapsLink()} target="_blank" rel="noopener noreferrer">
-              <button style={{ padding: "10px 20px", fontSize: "16px" }}>
-                ➡️ Route in Google Maps öffnen
-              </button>
+              <button style={{ padding: "10px 20px", fontSize: 16 }}>➡️ Route in Google Maps öffnen</button>
             </a>
           </div>
         </>
