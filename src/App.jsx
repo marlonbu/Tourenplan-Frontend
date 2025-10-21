@@ -8,7 +8,7 @@ function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0] // heutiges Datum
+    new Date().toISOString().split("T")[0]
   );
   const [tourData, setTourData] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,17 @@ function App() {
     try {
       const res = await fetch(`${API_BASE}/touren/${selectedFahrer}/${selectedDate}`);
       const data = await res.json();
-      setTourData(data);
+
+      // Dummy-Daten erweitern
+      const extended = data.map((stopp, idx) => ({
+        ...stopp,
+        ankunft: `0${8 + idx}:00`, // Beispielzeiten: 08:00, 09:00 ...
+        kunde: ["Müller GmbH", "Schmidt AG", "Bäckerei Weber", "Kaufland"][idx % 4],
+        kommission: `KOMM-${100 + idx}`,
+        bemerkung: idx % 2 === 0 ? "Bitte hinten anliefern" : "Direkt beim Kunden"
+      }));
+
+      setTourData(extended);
     } catch (err) {
       console.error("Fehler beim Laden der Tour:", err);
     }
@@ -86,11 +96,15 @@ function App() {
       {tourData.length > 0 && (
         <div>
           <h2 className="text-xl font-semibold mb-2">Tourübersicht</h2>
-          <table className="w-full border mb-4">
+          <table className="w-full border mb-4 text-sm">
             <thead>
               <tr className="bg-gray-200">
                 <th className="border px-2 py-1">Reihenfolge</th>
+                <th className="border px-2 py-1">Ankunftszeit</th>
+                <th className="border px-2 py-1">Kunde</th>
+                <th className="border px-2 py-1">Kommission</th>
                 <th className="border px-2 py-1">Adresse</th>
+                <th className="border px-2 py-1">Anmerkung</th>
                 <th className="border px-2 py-1">Erledigt</th>
               </tr>
             </thead>
@@ -98,7 +112,11 @@ function App() {
               {tourData.map((stopp) => (
                 <tr key={stopp.stopp_id}>
                   <td className="border px-2 py-1">{stopp.reihenfolge}</td>
+                  <td className="border px-2 py-1">{stopp.ankunft}</td>
+                  <td className="border px-2 py-1">{stopp.kunde}</td>
+                  <td className="border px-2 py-1">{stopp.kommission}</td>
                   <td className="border px-2 py-1">{stopp.adresse}</td>
+                  <td className="border px-2 py-1">{stopp.bemerkung}</td>
                   <td className="border px-2 py-1">
                     {stopp.erledigt ? "✅" : "❌"}
                   </td>
@@ -109,9 +127,9 @@ function App() {
 
           {/* Karte */}
           <MapContainer
-            center={[tourData[0].lat || 51.1657, tourData[0].lng || 10.4515]} // Fallback: Deutschland
+            center={[tourData[0].lat || 51.1657, tourData[0].lng || 10.4515]}
             zoom={10}
-            style={{ height: "500px", width: "100%" }}
+            style={{ height: "400px", width: "100%" }}
           >
             <TileLayer
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -122,14 +140,15 @@ function App() {
               .map((stopp, idx) => (
                 <Marker key={idx} position={[stopp.lat, stopp.lng]}>
                   <Popup>
-                    <b>Adresse:</b> {stopp.adresse}
+                    <b>{stopp.kunde}</b>
                     <br />
-                    <b>Reihenfolge:</b> {stopp.reihenfolge}
+                    {stopp.adresse}
+                    <br />
+                    Ankunft: {stopp.ankunft}
                   </Popup>
                 </Marker>
               ))}
 
-            {/* Route */}
             <Polyline
               positions={tourData
                 .filter((s) => s.lat && s.lng)
