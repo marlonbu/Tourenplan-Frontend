@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import L from "leaflet";
+import "leaflet-routing-machine";
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -35,8 +37,37 @@ function App() {
     return `${hour}:${minute}`;
   };
 
-  // Default center falls Tour leer ist
   const defaultPosition = [52.85, 8.05];
+
+  // Routing hinzufügen sobald Tour da ist
+  useEffect(() => {
+    if (tour.length > 1) {
+      const map = window._mapInstance;
+      if (!map) return;
+
+      // Entfernt alte Routen
+      if (map._routingControl) {
+        map.removeControl(map._routingControl);
+      }
+
+      const waypoints = tour.map((stopp) => L.latLng(stopp.lat, stopp.lng));
+
+      const routingControl = L.Routing.control({
+        waypoints: waypoints,
+        routeWhileDragging: false,
+        show: false,
+        addWaypoints: false,
+        draggableWaypoints: false,
+        createMarker: function (i, wp, nWps) {
+          return L.marker(wp.latLng).bindPopup(
+            `<b>${tour[i].kunde || "Unbekannt"}</b><br/>${tour[i].adresse}`
+          );
+        },
+      }).addTo(map);
+
+      map._routingControl = routingControl;
+    }
+  }, [tour]);
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
@@ -119,27 +150,18 @@ function App() {
         <p>Keine Tourdaten gefunden.</p>
       )}
 
-      {/* Karte jetzt unter der Tabelle */}
+      {/* Karte */}
       {tour.length > 0 && (
         <MapContainer
+          whenCreated={(mapInstance) => (window._mapInstance = mapInstance)}
           center={tour[0]?.lat && tour[0]?.lng ? [tour[0].lat, tour[0].lng] : defaultPosition}
           zoom={10}
-          style={{ height: "400px", width: "100%" }}
+          style={{ height: "600px", width: "100%" }}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
           />
-          {tour.map((stopp, index) => (
-            <Marker key={index} position={[stopp.lat, stopp.lng]}>
-              <Popup>
-                <b>{stopp.kunde || "Unbekannt"}</b> <br />
-                {stopp.adresse} <br />
-                {stopp.ankunftszeit && formatTime(stopp.ankunftszeit)}
-              </Popup>
-            </Marker>
-          ))}
-          <Polyline positions={tour.map((stopp) => [stopp.lat, stopp.lng])} color="blue" />
         </MapContainer>
       )}
     </div>
