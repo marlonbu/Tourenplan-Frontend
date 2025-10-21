@@ -5,7 +5,6 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
-// Fix für fehlende Marker Icons in Leaflet
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl:
@@ -16,14 +15,11 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// ✅ Routing-Komponente mit Fallback
+// Routing-Komponente
 function RoutingMachine({ waypoints }) {
   const map = useMap();
-
   useEffect(() => {
     if (!map) return;
-
-    // Nur gültige Stopps behalten
     const validWaypoints = waypoints.filter(
       (w) =>
         w.lat !== null &&
@@ -31,7 +27,6 @@ function RoutingMachine({ waypoints }) {
         !isNaN(w.lat) &&
         !isNaN(w.lng)
     );
-
     if (validWaypoints.length < 2) return;
 
     const routingControl = L.Routing.control({
@@ -63,14 +58,27 @@ function App() {
       .catch((err) => console.error(err));
   }, []);
 
-  // Tourdaten laden
+  // Tour laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
-
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
       .then((data) => setTourdaten(data))
       .catch((err) => console.error(err));
+  };
+
+  // Erledigt setzen
+  const setErledigt = async (stoppId) => {
+    try {
+      await fetch("https://tourenplan.onrender.com/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stopp_id: stoppId }),
+      });
+      ladeTour(); // neu laden nach Update
+    } catch (err) {
+      console.error("Fehler beim Setzen von erledigt:", err);
+    }
   };
 
   // Google Maps Button
@@ -84,7 +92,6 @@ function App() {
         !isNaN(s.lng)
     );
     if (valid.length === 0) return;
-
     const base = "https://www.google.com/maps/dir/";
     const coords = valid.map((s) => `${s.lat},${s.lng}`).join("/");
     window.open(base + coords, "_blank");
@@ -153,6 +160,9 @@ function App() {
               <th style={{ border: "1px solid #ccc", padding: "8px" }}>
                 Erledigt
               </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Aktion
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -169,6 +179,22 @@ function App() {
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.erledigt ? "✅" : "❌"}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {!stopp.erledigt && (
+                    <button
+                      onClick={() => setErledigt(stopp.stopp_id)}
+                      style={{
+                        padding: "5px 10px",
+                        background: "#28a745",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
+                    >
+                      Erledigt setzen
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -206,13 +232,7 @@ function App() {
             attribution="&copy; OpenStreetMap contributors"
           />
           {tourdaten
-            .filter(
-              (s) =>
-                s.lat !== null &&
-                s.lng !== null &&
-                !isNaN(s.lat) &&
-                !isNaN(s.lng)
-            )
+            .filter((s) => s.lat && s.lng)
             .map((stopp) => (
               <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
                 <Popup>
@@ -221,7 +241,6 @@ function App() {
                 </Popup>
               </Marker>
             ))}
-          {/* ✅ Routing über Straßen nur mit gültigen Stopps */}
           <RoutingMachine waypoints={tourdaten} />
         </MapContainer>
       )}
