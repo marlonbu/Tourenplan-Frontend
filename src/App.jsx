@@ -194,10 +194,11 @@ function App() {
                 <td>{stopp.anmerkung || "-"}</td>
                 <td>
                   {stopp.erledigt ? (
-                    "✅ Erledigt"
+                    "✅"
                   ) : (
-                    <button
-                      onClick={async () => {
+                    <input
+                      type="checkbox"
+                      onChange={async () => {
                         try {
                           await fetch(`${apiUrl}/scan`, {
                             method: "POST",
@@ -211,9 +212,7 @@ function App() {
                           console.error("Fehler beim Erledigen:", err);
                         }
                       }}
-                    >
-                      Erledigen
-                    </button>
+                    />
                   )}
                 </td>
               </tr>
