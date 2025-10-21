@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -32,6 +34,9 @@ function App() {
     minute = minute.padStart(2, "0");
     return `${hour}:${minute}`;
   };
+
+  // Default center falls Tour leer ist
+  const defaultPosition = [52.85, 8.05];
 
   return (
     <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
@@ -69,14 +74,15 @@ function App() {
         <button onClick={ladeTour}>Tour laden</button>
       </div>
 
+      {/* Tabelle */}
       <h2>Tourübersicht</h2>
-
       {tour.length > 0 ? (
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
             textAlign: "left",
+            marginBottom: "30px",
           }}
         >
           <thead>
@@ -100,19 +106,41 @@ function App() {
               >
                 <td style={tdStyle}>{index + 1}</td>
                 <td style={tdStyle}>{formatTime(stopp.ankunftszeit)}</td>
-                <td style={tdStyle}>{stopp.kunde}</td>
-                <td style={tdStyle}>{stopp.kommission}</td>
-                <td style={tdStyle}>{stopp.adresse}</td>
-                <td style={tdStyle}>{stopp.anmerkung}</td>
-                <td style={tdStyle}>
-                  {stopp.erledigt ? "✅" : "❌"}
-                </td>
+                <td style={tdStyle}>{stopp.kunde || "-"}</td>
+                <td style={tdStyle}>{stopp.kommission || "-"}</td>
+                <td style={tdStyle}>{stopp.adresse || "-"}</td>
+                <td style={tdStyle}>{stopp.anmerkung || "-"}</td>
+                <td style={tdStyle}>{stopp.erledigt ? "✅" : "❌"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       ) : (
         <p>Keine Tourdaten gefunden.</p>
+      )}
+
+      {/* Karte jetzt unter der Tabelle */}
+      {tour.length > 0 && (
+        <MapContainer
+          center={tour[0]?.lat && tour[0]?.lng ? [tour[0].lat, tour[0].lng] : defaultPosition}
+          zoom={10}
+          style={{ height: "400px", width: "100%" }}
+        >
+          <TileLayer
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
+          />
+          {tour.map((stopp, index) => (
+            <Marker key={index} position={[stopp.lat, stopp.lng]}>
+              <Popup>
+                <b>{stopp.kunde || "Unbekannt"}</b> <br />
+                {stopp.adresse} <br />
+                {stopp.ankunftszeit && formatTime(stopp.ankunftszeit)}
+              </Popup>
+            </Marker>
+          ))}
+          <Polyline positions={tour.map((stopp) => [stopp.lat, stopp.lng])} color="blue" />
+        </MapContainer>
       )}
     </div>
   );
