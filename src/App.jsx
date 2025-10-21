@@ -10,7 +10,7 @@ function App() {
   const [datum, setDatum] = useState("");
   const [tour, setTour] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [meldung, setMeldung] = useState(""); // neue Meldung
+  const [meldung, setMeldung] = useState("");
 
   const apiUrl = "https://tourenplan.onrender.com";
 
@@ -109,6 +109,26 @@ function App() {
     }
   }, [tour]);
 
+  // Google Maps Link generieren
+  const googleMapsLink = () => {
+    if (tour.length === 0) return "#";
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      tour[0].adresse
+    )}`;
+    url += `&destination=${encodeURIComponent(
+      tour[tour.length - 1].adresse
+    )}`;
+    if (tour.length > 2) {
+      const waypoints = tour
+        .slice(1, -1)
+        .map((s) => encodeURIComponent(s.adresse))
+        .join("|");
+      url += `&waypoints=${waypoints}`;
+    }
+    url += "&travelmode=driving";
+    return url;
+  };
+
   return (
     <div className="App">
       <h1>🚚 Tourenplan</h1>
@@ -161,6 +181,7 @@ function App() {
               <th>Kommission</th>
               <th>Adresse</th>
               <th>Anmerkung</th>
+              <th>Status</th>
             </tr>
           </thead>
           <tbody>
@@ -171,6 +192,30 @@ function App() {
                 <td>{stopp.kommission || `KOM-${1000 + i}`}</td>
                 <td>{stopp.adresse}</td>
                 <td>{stopp.anmerkung || "-"}</td>
+                <td>
+                  {stopp.erledigt ? (
+                    "✅ Erledigt"
+                  ) : (
+                    <button
+                      onClick={async () => {
+                        try {
+                          await fetch(`${apiUrl}/scan`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ stopp_id: stopp.stopp_id }),
+                          });
+                          const updatedTour = [...tour];
+                          updatedTour[i].erledigt = true;
+                          setTour(updatedTour);
+                        } catch (err) {
+                          console.error("Fehler beim Erledigen:", err);
+                        }
+                      }}
+                    >
+                      Erledigen
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -179,15 +224,26 @@ function App() {
 
       {/* Karte */}
       {tour.length > 0 && (
-        <div
-          id="map"
-          style={{
-            height: "500px",
-            width: "100%",
-            marginTop: "20px",
-            borderRadius: "12px",
-          }}
-        ></div>
+        <>
+          <div
+            id="map"
+            style={{
+              height: "500px",
+              width: "100%",
+              marginTop: "20px",
+              borderRadius: "12px",
+            }}
+          ></div>
+
+          {/* Google Maps Button */}
+          <div style={{ marginTop: "20px" }}>
+            <a href={googleMapsLink()} target="_blank" rel="noopener noreferrer">
+              <button style={{ padding: "10px 20px", fontSize: "16px" }}>
+                ➡️ Route in Google Maps öffnen
+              </button>
+            </a>
+          </div>
+        </>
       )}
     </div>
   );
