@@ -13,6 +13,7 @@ function App() {
 
   const mapRef = useRef(null);
   const routingControlRef = useRef(null);
+  const markersRef = useRef([]);
 
   const apiUrl = "https://tourenplan.onrender.com";
 
@@ -58,7 +59,7 @@ function App() {
     }
   };
 
-  // Karte initialisieren nur EINMAL
+  // Karte nur EINMAL initialisieren
   useEffect(() => {
     if (!mapRef.current) {
       mapRef.current = L.map("map", {
@@ -72,41 +73,47 @@ function App() {
     }
   }, []);
 
-  // Routing wenn Tour geladen ist
+  // Routing + Marker aktualisieren
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Alte Route entfernen
+    // Alte Marker löschen
+    markersRef.current.forEach((m) => mapRef.current.removeLayer(m));
+    markersRef.current = [];
+
+    // Alte Route löschen
     if (routingControlRef.current) {
       mapRef.current.removeControl(routingControlRef.current);
       routingControlRef.current = null;
     }
 
-    if (tour.length > 1) {
+    if (tour.length > 0) {
       // Marker hinzufügen
       tour.forEach((stopp) => {
-        L.marker([stopp.lat, stopp.lng])
-          .addTo(mapRef.current)
-          .bindPopup(stopp.adresse);
+        const marker = L.marker([stopp.lat, stopp.lng]).bindPopup(stopp.adresse);
+        marker.addTo(mapRef.current);
+        markersRef.current.push(marker);
       });
+    }
 
-      // Routing OHNE rechtsseitiges Panel
+    if (tour.length > 1) {
+      // Routing hinzufügen (ohne Panel)
       routingControlRef.current = L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
-        createMarker: (i, wp) => L.marker(wp.latLng, { draggable: false }),
+        createMarker: () => null, // keine extra Marker
         lineOptions: {
           styles: [{ color: "red", weight: 4 }],
         },
       }).addTo(mapRef.current);
 
-      // Panel entfernen
+      // Panel komplett verhindern
       routingControlRef.current.on("routeselected", () => {
         const container = document.querySelector(".leaflet-routing-container");
-        if (container) container.style.display = "none";
+        if (container) container.remove();
       });
     }
   }, [tour]);
