@@ -1,22 +1,8 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
-
-// Fix für Marker-Icons in Leaflet
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-
-delete L.Icon.Default.prototype._getIconUrl;
-
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -69,7 +55,7 @@ function App() {
     }
   };
 
-  // Routing in Karte einbauen
+  // Routing + Karte
   useEffect(() => {
     if (tour.length > 1) {
       const map = L.map("map", {
@@ -81,17 +67,29 @@ function App() {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
       }).addTo(map);
 
+      // Marker setzen
       tour.forEach((stopp) => {
-        L.marker([stopp.lat, stopp.lng])
-          .addTo(map)
-          .bindPopup(stopp.adresse);
+        L.marker([stopp.lat, stopp.lng]).addTo(map).bindPopup(stopp.adresse);
       });
 
+      // Routing hinzufügen, aber OHNE Turn-by-Turn Panel
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
-        show: false, // 🚀 entfernt die Sidebar mit Beschreibung
-      }).addTo(map);
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        lineOptions: { styles: [{ color: "red", weight: 4 }] },
+        createMarker: (i, wp) => {
+          return L.marker(wp.latLng).bindPopup(tour[i].adresse);
+        }
+      })
+        .on("routeselected", function (e) {
+          // Entfernt das Panel komplett
+          const container = document.querySelector(".leaflet-routing-container");
+          if (container) container.style.display = "none";
+        })
+        .addTo(map);
     }
   }, [tour]);
 
@@ -164,7 +162,7 @@ function App() {
             height: "500px",
             width: "100%",
             marginTop: "20px",
-            borderRadius: "10px",
+            borderRadius: "12px",
           }}
         ></div>
       )}
