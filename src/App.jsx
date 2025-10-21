@@ -73,10 +73,21 @@ function App() {
           .bindPopup(stopp.adresse);
       });
 
+      // 🚀 Routing ohne Panel
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
-        show: false, // 🚀 Panel wird deaktiviert
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        lineOptions: {
+          styles: [{ color: "red", weight: 4 }],
+        },
+        createMarker: (i, wp) => {
+          return L.marker(wp.latLng, { draggable: false });
+        },
+        // <<< Das hier entfernt die rechte Box komplett
+        itinerary: L.Routing.itinerary({ show: false })
       }).addTo(map);
     }
   }, [tour]);
