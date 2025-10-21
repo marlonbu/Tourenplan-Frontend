@@ -63,7 +63,20 @@ function App() {
     if (!selectedFahrer || !datum) return;
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
-      .then((data) => setTourdaten(data))
+      .then((data) => {
+        // ➕ Hier fügen wir Demo-Felder hinzu
+        const mitExtras = data.map((stopp, idx) => ({
+          ...stopp,
+          ankunftszeit: `${8 + idx}:00`,
+          kunde: `Kunde ${idx + 1}`,
+          kommission: `KOM-${1000 + idx}`,
+          anmerkung:
+            idx % 2 === 0
+              ? "Bitte beim Nachbarn klingeln"
+              : "Lieferung direkt ins Lager",
+        }));
+        setTourdaten(mitExtras);
+      })
       .catch((err) => console.error(err));
   };
 
@@ -126,7 +139,7 @@ function App() {
         </button>
       </div>
 
-      {/* Tabelle */}
+      {/* Tabelle mit mehr Infos */}
       {tourdaten.length > 0 && (
         <table
           style={{
@@ -141,7 +154,19 @@ function App() {
                 Reihenfolge
               </th>
               <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Adresse
+                Ankunftszeit
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Kunde
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Kommission
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Kundenadresse
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Anmerkung
               </th>
               <th style={{ border: "1px solid #ccc", padding: "8px" }}>
                 Erledigt
@@ -158,7 +183,19 @@ function App() {
                   {stopp.reihenfolge}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.ankunftszeit}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.kunde}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.kommission}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.adresse}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.anmerkung}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.erledigt ? "✅" : "❌"}
@@ -203,6 +240,7 @@ function App() {
             .map((stopp) => (
               <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
                 <Popup>
+                  {stopp.kunde} <br />
                   {stopp.adresse} <br />
                   {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
                 </Popup>
