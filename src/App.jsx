@@ -1,227 +1,199 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
+import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
+
+// Fix für fehlende Marker Icons in Leaflet
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
+  const [tourdaten, setTourdaten] = useState([]);
   const [datum, setDatum] = useState("");
-  const [tour, setTour] = useState([]);
+  const [map, setMap] = useState(null);
 
+  // Fahrer laden
   useEffect(() => {
     fetch("https://tourenplan.onrender.com/fahrer")
       .then((res) => res.json())
       .then((data) => setFahrer(data))
-      .catch((err) => console.error("Fehler beim Laden der Fahrer:", err));
+      .catch((err) => console.error(err));
   }, []);
 
+  // Tourdaten laden
   const ladeTour = () => {
-    if (!selectedFahrer || !datum) {
-      alert("Bitte Fahrer und Datum auswählen!");
-      return;
-    }
+    if (!selectedFahrer || !datum) return;
 
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
       .then((data) => {
-        // Dummy-Daten hinzufügen
-        const kunden = ["Müller GmbH", "Schmidt AG", "Bäckerei Weber", "Kaufland"];
-        const anmerkungen = ["Bitte hinten anliefern", "Direkt beim Kunden", "Vorsicht Glas", "Lagerhalle"];
+        setTourdaten(data);
 
-        const erweitert = data.map((stopp, idx) => ({
-          ...stopp,
-          kunde: kunden[idx % kunden.length],
-          kommission: `KOMM-${100 + idx}`,
-          anmerkung: anmerkungen[idx % anmerkungen.length],
-          ankunftszeit: `${String(8 + idx).padStart(2, "0")}:00`
-        }));
-
-        setTour(erweitert);
-      })
-      .catch((err) => console.error("Fehler beim Laden der Tour:", err));
-  };
-
-  const formatTime = (timeString) => {
-    if (!timeString) return "";
-    let [hour, minute] = timeString.split(":");
-    hour = hour.padStart(2, "0");
-    minute = minute.padStart(2, "0");
-    return `${hour}:${minute}`;
-  };
-
-  const defaultPosition = [52.85, 8.05];
-
-  // Routing in OSM-Karte einfügen
-  useEffect(() => {
-    if (tour.length > 1) {
-      const map = window._mapInstance;
-      if (!map) return;
-
-      // Alte Routen entfernen
-      if (map._routingControl) {
-        map.removeControl(map._routingControl);
-      }
-
-      const waypoints = tour.map((stopp) => L.latLng(stopp.lat, stopp.lng));
-
-      const routingControl = L.Routing.control({
-        waypoints: waypoints,
-        lineOptions: {
-          styles: [{ color: "#007bff", weight: 5 }]
-        },
-        routeWhileDragging: false,
-        show: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        createMarker: function (i, wp, nWps) {
-          return L.marker(wp.latLng).bindPopup(
-            `<b>${tour[i].kunde}</b><br/>${tour[i].adresse}<br/>${tour[i].ankunftszeit}`
+        // Routing einfügen
+        if (map && data.length > 1) {
+          const waypoints = data.map(
+            (stopp) => L.latLng(stopp.lat, stopp.lng)
           );
-        },
-      }).addTo(map);
 
-      map._routingControl = routingControl;
-    }
-  }, [tour]);
+          L.Routing.control({
+            waypoints: waypoints,
+            lineOptions: { styles: [{ color: "#0077ff", weight: 5 }] },
+            show: false,
+            addWaypoints: false,
+            routeWhileDragging: false,
+          }).addTo(map);
+        }
+      })
+      .catch((err) => console.error(err));
+  };
 
-  // Google Maps Route-Link bauen
-  const getGoogleMapsLink = () => {
-    if (tour.length === 0) return "#";
-    const coords = tour.map((s) => `${s.lat},${s.lng}`).join("/");
-    return `https://www.google.com/maps/dir/${coords}`;
+  // Google Maps Button
+  const openInGoogleMaps = () => {
+    if (tourdaten.length === 0) return;
+    const base = "https://www.google.com/maps/dir/";
+    const coords = tourdaten.map((s) => `${s.lat},${s.lng}`).join("/");
+    window.open(base + coords, "_blank");
   };
 
   return (
-    <div style={{ padding: "20px", fontFamily: "Arial, sans-serif" }}>
-      <h1>🚚 Tourenplan</h1>
+    <div style={{ fontFamily: "Arial, sans-serif", padding: "20px" }}>
+      <h1 style={{ marginBottom: "20px" }}>🚚 Tourenplan</h1>
 
-      <div style={{ marginBottom: "20px" }}>
-        <label>
-          Fahrer:&nbsp;
-          <select
-            value={selectedFahrer}
-            onChange={(e) => setSelectedFahrer(e.target.value)}
-          >
-            <option value="">-- bitte wählen --</option>
-            {fahrer.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* Fahrer Auswahl */}
+      <div style={{ marginBottom: "15px" }}>
+        <label>Fahrer: </label>
+        <select
+          value={selectedFahrer}
+          onChange={(e) => setSelectedFahrer(e.target.value)}
+        >
+          <option value="">-- bitte wählen --</option>
+          {fahrer.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+      </div>
 
-        &nbsp;&nbsp;
-
-        <label>
-          Datum:&nbsp;
-          <input
-            type="date"
-            value={datum}
-            onChange={(e) => setDatum(e.target.value)}
-          />
-        </label>
-
-        &nbsp;&nbsp;
-
-        <button onClick={ladeTour}>Tour laden</button>
+      {/* Datum Auswahl */}
+      <div style={{ marginBottom: "15px" }}>
+        <label>Datum: </label>
+        <input
+          type="date"
+          value={datum}
+          onChange={(e) => setDatum(e.target.value)}
+        />
+        <button
+          onClick={ladeTour}
+          style={{
+            marginLeft: "10px",
+            padding: "5px 10px",
+            background: "#0077ff",
+            color: "#fff",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          Laden
+        </button>
       </div>
 
       {/* Tabelle */}
-      <h2>Tourübersicht</h2>
-      {tour.length > 0 ? (
+      {tourdaten.length > 0 && (
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            textAlign: "left",
             marginBottom: "20px",
           }}
         >
           <thead>
-            <tr style={{ backgroundColor: "#f2f2f2" }}>
-              <th style={thStyle}>Reihenfolge</th>
-              <th style={thStyle}>Ankunftszeit</th>
-              <th style={thStyle}>Kunde</th>
-              <th style={thStyle}>Kommission</th>
-              <th style={thStyle}>Adresse</th>
-              <th style={thStyle}>Anmerkung</th>
-              <th style={thStyle}>Erledigt</th>
+            <tr style={{ background: "#f2f2f2" }}>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Reihenfolge
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Adresse
+              </th>
+              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
+                Erledigt
+              </th>
             </tr>
           </thead>
           <tbody>
-            {tour.map((stopp, index) => (
+            {tourdaten.map((stopp, idx) => (
               <tr
-                key={stopp.stopp_id || index}
-                style={{
-                  backgroundColor: index % 2 === 0 ? "#ffffff" : "#f9f9f9",
-                }}
+                key={stopp.stopp_id}
+                style={{ background: idx % 2 === 0 ? "#fff" : "#f9f9f9" }}
               >
-                <td style={tdStyle}>{index + 1}</td>
-                <td style={tdStyle}>{formatTime(stopp.ankunftszeit)}</td>
-                <td style={tdStyle}>{stopp.kunde}</td>
-                <td style={tdStyle}>{stopp.kommission}</td>
-                <td style={tdStyle}>{stopp.adresse}</td>
-                <td style={tdStyle}>{stopp.anmerkung}</td>
-                <td style={tdStyle}>{stopp.erledigt ? "✅" : "❌"}</td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.reihenfolge}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.adresse}
+                </td>
+                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
+                  {stopp.erledigt ? "✅" : "❌"}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
-      ) : (
-        <p>Keine Tourdaten gefunden.</p>
       )}
 
       {/* Google Maps Button */}
-      {tour.length > 0 && (
-        <div style={{ marginBottom: "20px" }}>
-          <a
-            href={getGoogleMapsLink()}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-block",
-              backgroundColor: "#28a745",
-              color: "white",
-              padding: "10px 20px",
-              borderRadius: "6px",
-              textDecoration: "none",
-            }}
-          >
-            ➡️ Route in Google Maps öffnen
-          </a>
-        </div>
+      {tourdaten.length > 0 && (
+        <button
+          onClick={openInGoogleMaps}
+          style={{
+            padding: "10px 15px",
+            background: "#34A853",
+            color: "#fff",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+            marginBottom: "20px",
+          }}
+        >
+          ➡️ Route in Google Maps öffnen
+        </button>
       )}
 
       {/* Karte */}
-      {tour.length > 0 && (
+      {tourdaten.length > 0 && (
         <MapContainer
-          whenCreated={(mapInstance) => (window._mapInstance = mapInstance)}
-          center={tour[0]?.lat && tour[0]?.lng ? [tour[0].lat, tour[0].lng] : defaultPosition}
+          center={[tourdaten[0].lat, tourdaten[0].lng]}
           zoom={10}
-          style={{ height: "600px", width: "100%" }}
+          style={{ height: "500px", width: "100%" }}
+          whenCreated={setMap}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
+            attribution="&copy; OpenStreetMap contributors"
           />
+          {tourdaten.map((stopp) => (
+            <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
+              <Popup>
+                {stopp.adresse} <br />
+                {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
       )}
     </div>
   );
 }
-
-const thStyle = {
-  border: "1px solid #ddd",
-  padding: "8px",
-  backgroundColor: "#f4f4f4",
-};
-
-const tdStyle = {
-  border: "1px solid #ddd",
-  padding: "8px",
-};
 
 export default App;
