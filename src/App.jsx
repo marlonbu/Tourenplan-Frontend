@@ -53,13 +53,13 @@ function App() {
 
   const defaultPosition = [52.85, 8.05];
 
-  // Routing hinzufügen sobald Tour da ist
+  // Routing in OSM-Karte einfügen
   useEffect(() => {
     if (tour.length > 1) {
       const map = window._mapInstance;
       if (!map) return;
 
-      // Entfernt alte Routen
+      // Alte Routen entfernen
       if (map._routingControl) {
         map.removeControl(map._routingControl);
       }
@@ -68,6 +68,9 @@ function App() {
 
       const routingControl = L.Routing.control({
         waypoints: waypoints,
+        lineOptions: {
+          styles: [{ color: "#007bff", weight: 5 }]
+        },
         routeWhileDragging: false,
         show: false,
         addWaypoints: false,
