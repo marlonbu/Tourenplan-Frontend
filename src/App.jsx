@@ -67,20 +67,6 @@ function App() {
       .catch((err) => console.error(err));
   };
 
-  // Erledigt setzen
-  const setErledigt = async (stoppId) => {
-    try {
-      await fetch("https://tourenplan.onrender.com/scan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stopp_id: stoppId }),
-      });
-      ladeTour(); // neu laden nach Update
-    } catch (err) {
-      console.error("Fehler beim Setzen von erledigt:", err);
-    }
-  };
-
   // Google Maps Button
   const openInGoogleMaps = () => {
     if (tourdaten.length === 0) return;
@@ -160,9 +146,6 @@ function App() {
               <th style={{ border: "1px solid #ccc", padding: "8px" }}>
                 Erledigt
               </th>
-              <th style={{ border: "1px solid #ccc", padding: "8px" }}>
-                Aktion
-              </th>
             </tr>
           </thead>
           <tbody>
@@ -179,22 +162,6 @@ function App() {
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.erledigt ? "✅" : "❌"}
-                </td>
-                <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {!stopp.erledigt && (
-                    <button
-                      onClick={() => setErledigt(stopp.stopp_id)}
-                      style={{
-                        padding: "5px 10px",
-                        background: "#28a745",
-                        color: "#fff",
-                        border: "none",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Erledigt setzen
-                    </button>
-                  )}
                 </td>
               </tr>
             ))}
