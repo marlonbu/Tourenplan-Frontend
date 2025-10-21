@@ -1,73 +1,72 @@
-.app-container {
+.App {
   font-family: Arial, sans-serif;
   padding: 20px;
-  background: #f8f9fa;
-  min-height: 100vh;
+  max-width: 1200px;
+  margin: auto;
 }
 
-.header {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 15px;
+h1 {
+  text-align: center;
   margin-bottom: 20px;
-}
-
-.logo {
-  height: 60px;
-  margin-right: 15px;
-  vertical-align: middle;
 }
 
 .controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 10px;
-  margin-bottom: 20px;
+  margin: 10px 0;
+  justify-content: center;
 }
 
-.controls label {
-  font-weight: bold;
+button {
+  padding: 8px 16px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.tour-table {
+button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
+}
+
+select,
+input[type="date"] {
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+/* Tabelle */
+table {
   width: 100%;
   border-collapse: collapse;
-  margin-bottom: 20px;
-  background: white;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  margin-top: 20px;
+  font-size: 14px;
 }
 
-.tour-table th {
-  background: #007bff;
-  color: white;
+thead {
+  background-color: #f2f2f2;
+}
+
+th,
+td {
+  border: 1px solid #ddd;
   padding: 10px;
   text-align: left;
 }
 
-.tour-table td {
-  border: 1px solid #ddd;
-  padding: 8px;
+/* Zebra-Streifen */
+tbody tr:nth-child(odd) {
+  background-color: #f9f9f9;
 }
 
-.tour-table tr:nth-child(even) {
-  background: #f2f2f2;
+tbody tr:nth-child(even) {
+  background-color: #ffffff;
 }
 
-.maps-btn {
-  text-align: center;
-  margin-top: 20px;
-}
-
-.maps-btn a {
-  background: #007bff;
-  color: #fff;
-  padding: 10px 20px;
-  text-decoration: none;
-  border-radius: 5px;
-  transition: background 0.2s ease;
-}
-
-.maps-btn a:hover {
-  background: #0056b3;
+/* Hover-Effekt */
+tbody tr:hover {
+  background-color: #f1f1f1;
 }
