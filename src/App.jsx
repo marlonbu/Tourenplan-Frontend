@@ -1,8 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
+
+// --- Marker-Fix: sorgt dafür, dass die blauen Leaflet-Pins korrekt geladen werden ---
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -12,6 +24,10 @@ function App() {
   const [loading, setLoading] = useState(false);
 
   const apiUrl = "https://tourenplan.onrender.com";
+
+  // Leaflet-Refs, damit wir Map & Routing sauber aufräumen können
+  const mapRef = useRef(null);
+  const routingRef = useRef(null);
 
   // Fahrer laden
   useEffect(() => {
@@ -37,7 +53,7 @@ function App() {
       });
   };
 
-  // 🚀 Demo neu laden (reset + seed)
+  // Demo neu laden
   const resetUndSeed = async () => {
     try {
       setLoading(true);
@@ -47,6 +63,15 @@ function App() {
       setTour([]);
       setSelectedFahrer("");
       setDatum("");
+      // Karte aufräumen, falls sie offen war
+      if (routingRef.current) {
+        routingRef.current.remove();
+        routingRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
     } catch (err) {
       console.error("Fehler beim Reset/Seed:", err);
       alert("❌ Fehler beim Demo-Neuladen");
@@ -55,13 +80,25 @@ function App() {
     }
   };
 
-  // Routing + Karte
+  // Karte & Routing aufbauen, wenn Tour vorhanden
   useEffect(() => {
+    // vorherige Instanzen sauber entfernen
+    if (routingRef.current) {
+      routingRef.current.remove();
+      routingRef.current = null;
+    }
+    if (mapRef.current) {
+      mapRef.current.remove();
+      mapRef.current = null;
+    }
+
     if (tour.length > 1) {
+      // Map erstellen
       const map = L.map("map", {
         center: [tour[0].lat, tour[0].lng],
         zoom: 10,
       });
+      mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
@@ -72,25 +109,43 @@ function App() {
         L.marker([stopp.lat, stopp.lng]).addTo(map).bindPopup(stopp.adresse);
       });
 
-      // Routing hinzufügen, aber OHNE Turn-by-Turn Panel
-      L.Routing.control({
+      // Routing hinzufügen
+      const routing = L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
         lineOptions: { styles: [{ color: "red", weight: 4 }] },
-        createMarker: (i, wp) => {
-          return L.marker(wp.latLng).bindPopup(tour[i].adresse);
-        }
+        createMarker: (i, wp) => L.marker(wp.latLng).bindPopup(tour[i].adresse),
       })
-        .on("routeselected", function (e) {
-          // Entfernt das Panel komplett
-          const container = document.querySelector(".leaflet-routing-container");
-          if (container) container.style.display = "none";
+        .on("routeselected", () => {
+          // Panel (Turn-by-Turn) zuverlässig weg
+          const panel = document.querySelector(".leaflet-routing-container");
+          if (panel) panel.style.display = "none";
         })
         .addTo(map);
+
+      routingRef.current = routing;
+
+      // Falls das Panel noch später gerendert wird: nachträglich entfernen
+      setTimeout(() => {
+        const panel = document.querySelector(".leaflet-routing-container");
+        if (panel) panel.style.display = "none";
+      }, 200);
     }
+
+    // Cleanup, wenn Komponente unmountet oder Tour wechselt
+    return () => {
+      if (routingRef.current) {
+        routingRef.current.remove();
+        routingRef.current = null;
+      }
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
   }, [tour]);
 
   return (
@@ -159,12 +214,14 @@ function App() {
         <div
           id="map"
           style={{
-            height: "500px",
+            height: "600px",
             width: "100%",
             marginTop: "20px",
             borderRadius: "12px",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+            overflow: "hidden",
           }}
-        ></div>
+        />
       )}
     </div>
   );
