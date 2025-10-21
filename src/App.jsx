@@ -63,20 +63,7 @@ function App() {
     if (!selectedFahrer || !datum) return;
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
-      .then((data) => {
-        // ➕ Hier fügen wir Demo-Felder hinzu
-        const mitExtras = data.map((stopp, idx) => ({
-          ...stopp,
-          ankunftszeit: `${8 + idx}:00`,
-          kunde: `Kunde ${idx + 1}`,
-          kommission: `KOM-${1000 + idx}`,
-          anmerkung:
-            idx % 2 === 0
-              ? "Bitte beim Nachbarn klingeln"
-              : "Lieferung direkt ins Lager",
-        }));
-        setTourdaten(mitExtras);
-      })
+      .then((data) => setTourdaten(data))
       .catch((err) => console.error(err));
   };
 
@@ -139,7 +126,7 @@ function App() {
         </button>
       </div>
 
-      {/* Tabelle mit mehr Infos */}
+      {/* Tabelle mit echten DB-Feldern */}
       {tourdaten.length > 0 && (
         <table
           style={{
@@ -183,19 +170,19 @@ function App() {
                   {stopp.reihenfolge}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.ankunftszeit}
+                  {stopp.ankunftszeit || "-"}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.kunde}
+                  {stopp.kunde || "-"}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.kommission}
+                  {stopp.kommission || "-"}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.adresse}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
-                  {stopp.anmerkung}
+                  {stopp.anmerkung || "-"}
                 </td>
                 <td style={{ border: "1px solid #ccc", padding: "8px" }}>
                   {stopp.erledigt ? "✅" : "❌"}
@@ -240,8 +227,9 @@ function App() {
             .map((stopp) => (
               <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
                 <Popup>
-                  {stopp.kunde} <br />
+                  <b>{stopp.kunde}</b> <br />
                   {stopp.adresse} <br />
+                  {stopp.kommission} <br />
                   {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
                 </Popup>
               </Marker>
