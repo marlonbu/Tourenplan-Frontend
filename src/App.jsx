@@ -77,11 +77,11 @@ function App() {
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Alte Marker löschen
+    // alte Marker löschen
     markersRef.current.forEach((m) => mapRef.current.removeLayer(m));
     markersRef.current = [];
 
-    // Alte Route löschen
+    // alte Route löschen
     if (routingControlRef.current) {
       mapRef.current.removeControl(routingControlRef.current);
       routingControlRef.current = null;
@@ -97,24 +97,19 @@ function App() {
     }
 
     if (tour.length > 1) {
-      // Routing hinzufügen (ohne Panel)
+      // Routing OHNE Panel
       routingControlRef.current = L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
         addWaypoints: false,
         draggableWaypoints: false,
         fitSelectedRoutes: true,
-        createMarker: () => null, // keine extra Marker
+        show: false, // 🚀 Panel wird deaktiviert
+        createMarker: () => null,
         lineOptions: {
           styles: [{ color: "red", weight: 4 }],
         },
       }).addTo(mapRef.current);
-
-      // Panel komplett verhindern
-      routingControlRef.current.on("routeselected", () => {
-        const container = document.querySelector(".leaflet-routing-container");
-        if (container) container.remove();
-      });
     }
   }, [tour]);
 
