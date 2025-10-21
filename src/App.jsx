@@ -73,7 +73,6 @@ function App() {
           .bindPopup(stopp.adresse);
       });
 
-      // 🚀 Routing ohne Panel
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
@@ -85,10 +84,14 @@ function App() {
         },
         createMarker: (i, wp) => {
           return L.marker(wp.latLng, { draggable: false });
-        },
-        // <<< Das hier entfernt die rechte Box komplett
-        itinerary: L.Routing.itinerary({ show: false })
+        }
       }).addTo(map);
+
+      // 🚀 Panel nach dem Rendern entfernen
+      setTimeout(() => {
+        const panel = document.querySelector(".leaflet-routing-container");
+        if (panel) panel.remove();
+      }, 100);
     }
   }, [tour]);
 
