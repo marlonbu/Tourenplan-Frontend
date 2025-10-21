@@ -5,31 +5,62 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 
 function App() {
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(!!token);
+
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState("");
   const [tour, setTour] = useState([]);
   const [weekData, setWeekData] = useState([]);
-  const [view, setView] = useState("day"); // "day" oder "week"
+  const [view, setView] = useState("day");
   const [loading, setLoading] = useState(false);
   const [meldung, setMeldung] = useState("");
 
   const apiUrl = "https://tourenplan.onrender.com";
 
+  // Login Funktion
+  const handleLogin = async () => {
+    try {
+      const res = await fetch(`${apiUrl}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem("token", data.token);
+        setToken(data.token);
+        setIsLoggedIn(true);
+      } else {
+        alert("❌ Falsches Passwort");
+      }
+    } catch (err) {
+      console.error("Login-Fehler:", err);
+    }
+  };
+
+  // Helper für API Calls mit Token
+  const fetchWithAuth = (url) =>
+    fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+
   // Fahrer laden
   useEffect(() => {
-    fetch(`${apiUrl}/fahrer`)
-      .then((res) => res.json())
-      .then(setFahrer)
-      .catch((err) => console.error(err));
-  }, []);
+    if (isLoggedIn) {
+      fetchWithAuth(`${apiUrl}/fahrer`)
+        .then((res) => res.json())
+        .then(setFahrer)
+        .catch((err) => console.error(err));
+    }
+  }, [isLoggedIn]);
 
   // Tagesansicht laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
     setMeldung("");
-    fetch(`${apiUrl}/touren/${selectedFahrer}/${datum}`)
+    fetchWithAuth(`${apiUrl}/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.length === 0) setMeldung("⚠️ Keine Tour gefunden.");
@@ -43,7 +74,7 @@ function App() {
   const ladeWoche = () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
-    fetch(`${apiUrl}/touren/woche/${selectedFahrer}/${datum}`)
+    fetchWithAuth(`${apiUrl}/touren/woche/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
       .then((data) => setWeekData(data))
       .catch(console.error)
@@ -78,17 +109,32 @@ function App() {
     }
   }, [tour, view]);
 
+  // 🚪 Login Screen
+  if (!isLoggedIn) {
+    return (
+      <div className="App">
+        <h1>🔑 Login</h1>
+        <input
+          type="password"
+          placeholder="Passwort eingeben"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button onClick={handleLogin}>Login</button>
+      </div>
+    );
+  }
+
+  // ✅ Wenn eingeloggt → App
   return (
     <div className="App">
       <h1>🚚 Tourenplan</h1>
 
-      {/* Tabs */}
       <div className="tabs">
         <button onClick={() => setView("day")} disabled={view === "day"}>📅 Tagesansicht</button>
         <button onClick={() => setView("week")} disabled={view === "week"}>🗓️ Wochenübersicht</button>
       </div>
 
-      {/* Fahrer + Datum Auswahl */}
       <div className="controls">
         <select value={selectedFahrer} onChange={(e) => setSelectedFahrer(e.target.value)}>
           <option value="">Fahrer auswählen</option>
@@ -101,7 +147,6 @@ function App() {
         {view === "week" && <button onClick={ladeWoche} disabled={loading}>Wochenübersicht laden</button>}
       </div>
 
-      {/* Tagesansicht */}
       {view === "day" && (
         <>
           {meldung && <div style={{ color: "red", fontWeight: "bold" }}>{meldung}</div>}
@@ -135,7 +180,6 @@ function App() {
         </>
       )}
 
-      {/* Wochenübersicht */}
       {view === "week" && (
         <>
           {weekData.length > 0 && (
