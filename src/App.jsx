@@ -1,8 +1,22 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
+import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import "leaflet-routing-machine";
+
+// Fix für Marker-Icons in Leaflet
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: markerIcon2x,
+  iconUrl: markerIcon,
+  shadowUrl: markerShadow,
+});
 
 function App() {
   const [fahrer, setFahrer] = useState([]);
@@ -37,7 +51,7 @@ function App() {
       });
   };
 
-  // Demo neu laden
+  // 🚀 Demo neu laden (reset + seed)
   const resetUndSeed = async () => {
     try {
       setLoading(true);
@@ -76,22 +90,8 @@ function App() {
       L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
-        addWaypoints: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        lineOptions: {
-          styles: [{ color: "red", weight: 4 }],
-        },
-        createMarker: (i, wp) => {
-          return L.marker(wp.latLng, { draggable: false });
-        }
+        show: false, // 🚀 entfernt die Sidebar mit Beschreibung
       }).addTo(map);
-
-      // 🚀 Panel nach dem Rendern entfernen
-      setTimeout(() => {
-        const panel = document.querySelector(".leaflet-routing-container");
-        if (panel) panel.remove();
-      }, 100);
     }
   }, [tour]);
 
@@ -160,7 +160,12 @@ function App() {
       {tour.length > 0 && (
         <div
           id="map"
-          style={{ height: "500px", width: "100%", marginTop: "20px" }}
+          style={{
+            height: "500px",
+            width: "100%",
+            marginTop: "20px",
+            borderRadius: "10px",
+          }}
         ></div>
       )}
     </div>
