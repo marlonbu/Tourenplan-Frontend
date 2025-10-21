@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 
 function App() {
@@ -11,6 +10,9 @@ function App() {
   const [datum, setDatum] = useState("");
   const [tour, setTour] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const mapRef = useRef(null);
+  const routingControlRef = useRef(null);
 
   const apiUrl = "https://tourenplan.onrender.com";
 
@@ -38,7 +40,7 @@ function App() {
       });
   };
 
-  // 🚀 Demo neu laden (reset + seed)
+  // Demo neu laden
   const resetUndSeed = async () => {
     try {
       setLoading(true);
@@ -56,28 +58,56 @@ function App() {
     }
   };
 
-  // Routing in Karte einbauen
+  // Karte initialisieren nur EINMAL
   useEffect(() => {
-    if (tour.length > 1) {
-      const map = L.map("map", {
-        center: [tour[0].lat, tour[0].lng],
-        zoom: 10,
+    if (!mapRef.current) {
+      mapRef.current = L.map("map", {
+        center: [52.85, 8.05],
+        zoom: 8,
       });
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="http://osm.org">OpenStreetMap</a>',
-      }).addTo(map);
+      }).addTo(mapRef.current);
+    }
+  }, []);
 
+  // Routing wenn Tour geladen ist
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Alte Route entfernen
+    if (routingControlRef.current) {
+      mapRef.current.removeControl(routingControlRef.current);
+      routingControlRef.current = null;
+    }
+
+    if (tour.length > 1) {
+      // Marker hinzufügen
       tour.forEach((stopp) => {
         L.marker([stopp.lat, stopp.lng])
-          .addTo(map)
+          .addTo(mapRef.current)
           .bindPopup(stopp.adresse);
       });
 
-      L.Routing.control({
+      // Routing OHNE rechtsseitiges Panel
+      routingControlRef.current = L.Routing.control({
         waypoints: tour.map((s) => L.latLng(s.lat, s.lng)),
         routeWhileDragging: false,
-      }).addTo(map);
+        addWaypoints: false,
+        draggableWaypoints: false,
+        fitSelectedRoutes: true,
+        createMarker: (i, wp) => L.marker(wp.latLng, { draggable: false }),
+        lineOptions: {
+          styles: [{ color: "red", weight: 4 }],
+        },
+      }).addTo(mapRef.current);
+
+      // Panel entfernen
+      routingControlRef.current.on("routeselected", () => {
+        const container = document.querySelector(".leaflet-routing-container");
+        if (container) container.style.display = "none";
+      });
     }
   }, [tour]);
 
@@ -85,7 +115,7 @@ function App() {
     <div className="App">
       <h1>🚚 Tourenplan</h1>
 
-      {/* Reset Button */}
+      {/* Buttons */}
       <div className="controls">
         <button onClick={resetUndSeed} disabled={loading}>
           🔄 Demo neu laden
