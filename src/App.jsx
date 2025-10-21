@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
@@ -16,12 +16,44 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
+// ✅ Routing-Komponente mit Fallback
+function RoutingMachine({ waypoints }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) return;
+
+    // Nur gültige Stopps behalten
+    const validWaypoints = waypoints.filter(
+      (w) =>
+        w.lat !== null &&
+        w.lng !== null &&
+        !isNaN(w.lat) &&
+        !isNaN(w.lng)
+    );
+
+    if (validWaypoints.length < 2) return;
+
+    const routingControl = L.Routing.control({
+      waypoints: validWaypoints.map((w) => L.latLng(w.lat, w.lng)),
+      lineOptions: { styles: [{ color: "#0077ff", weight: 5 }] },
+      show: false,
+      addWaypoints: false,
+      draggableWaypoints: false,
+      routeWhileDragging: false,
+    }).addTo(map);
+
+    return () => map.removeControl(routingControl);
+  }, [map, waypoints]);
+
+  return null;
+}
+
 function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [tourdaten, setTourdaten] = useState([]);
   const [datum, setDatum] = useState("");
-  const [map, setMap] = useState(null);
 
   // Fahrer laden
   useEffect(() => {
@@ -37,32 +69,24 @@ function App() {
 
     fetch(`https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`)
       .then((res) => res.json())
-      .then((data) => {
-        setTourdaten(data);
-
-        // Routing einfügen
-        if (map && data.length > 1) {
-          const waypoints = data.map(
-            (stopp) => L.latLng(stopp.lat, stopp.lng)
-          );
-
-          L.Routing.control({
-            waypoints: waypoints,
-            lineOptions: { styles: [{ color: "#0077ff", weight: 5 }] },
-            show: false,
-            addWaypoints: false,
-            routeWhileDragging: false,
-          }).addTo(map);
-        }
-      })
+      .then((data) => setTourdaten(data))
       .catch((err) => console.error(err));
   };
 
   // Google Maps Button
   const openInGoogleMaps = () => {
     if (tourdaten.length === 0) return;
+    const valid = tourdaten.filter(
+      (s) =>
+        s.lat !== null &&
+        s.lng !== null &&
+        !isNaN(s.lat) &&
+        !isNaN(s.lng)
+    );
+    if (valid.length === 0) return;
+
     const base = "https://www.google.com/maps/dir/";
-    const coords = tourdaten.map((s) => `${s.lat},${s.lng}`).join("/");
+    const coords = valid.map((s) => `${s.lat},${s.lng}`).join("/");
     window.open(base + coords, "_blank");
   };
 
@@ -176,20 +200,29 @@ function App() {
           center={[tourdaten[0].lat, tourdaten[0].lng]}
           zoom={10}
           style={{ height: "500px", width: "100%" }}
-          whenCreated={setMap}
         >
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution="&copy; OpenStreetMap contributors"
           />
-          {tourdaten.map((stopp) => (
-            <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
-              <Popup>
-                {stopp.adresse} <br />
-                {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
-              </Popup>
-            </Marker>
-          ))}
+          {tourdaten
+            .filter(
+              (s) =>
+                s.lat !== null &&
+                s.lng !== null &&
+                !isNaN(s.lat) &&
+                !isNaN(s.lng)
+            )
+            .map((stopp) => (
+              <Marker key={stopp.stopp_id} position={[stopp.lat, stopp.lng]}>
+                <Popup>
+                  {stopp.adresse} <br />
+                  {stopp.erledigt ? "✅ erledigt" : "❌ offen"}
+                </Popup>
+              </Marker>
+            ))}
+          {/* ✅ Routing über Straßen nur mit gültigen Stopps */}
+          <RoutingMachine waypoints={tourdaten} />
         </MapContainer>
       )}
     </div>
