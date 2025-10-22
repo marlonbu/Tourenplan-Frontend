@@ -1,4 +1,6 @@
-/* Grundlayout */
+/* ===================================
+   Grundlayout & Farbvariablen
+=================================== */
 :root {
   --bg: #f7f7fb;
   --card: #ffffff;
@@ -6,173 +8,223 @@
   --text: #1f2937;
   --muted: #6b7280;
   --primary: #1f6feb;
-  --shadow: 0 2px 8px rgba(0,0,0,.06);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   --radius: 12px;
 }
 
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+    "Segoe UI Emoji";
   background: var(--bg);
   color: var(--text);
 }
 
-.container {
+.App {
   max-width: 1200px;
-  margin: 24px auto 64px;
+  margin: 30px auto 60px;
   padding: 0 16px;
+  text-align: center;
 }
 
-/* Header */
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 16px;
+/* ===================================
+   Login
+=================================== */
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.login-container h2 {
+  margin-bottom: 20px;
+}
+
+.login-container input {
+  width: 80%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.login-container button {
+  padding: 10px 20px;
+  background-color: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.login-container button:hover {
+  background-color: #1749b3;
+}
+
+/* ===================================
+   Header / Tabs / Logout
+=================================== */
+h1 {
+  color: #2c3e50;
   margin-bottom: 16px;
 }
-.header h1 {
-  font-size: 24px;
-  margin: 0;
-}
-.user { display: flex; align-items: center; gap: 8px; }
-.badge {
-  background: #e9f1ff;
-  color: #184faa;
-  border: 1px solid #cfe0ff;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-}
 
-/* Buttons */
-.btn {
-  appearance: none;
-  border: 1px solid var(--border);
-  background: var(--card);
-  padding: 10px 14px;
-  border-radius: 10px;
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  transition: transform .02s ease-in, background .15s ease, border-color .15s ease;
-  text-decoration: none;
-  color: var(--text);
-}
-.btn:hover { background: #f9fafb; }
-.btn:active { transform: translateY(1px); }
-.btn.primary {
-  background: var(--primary);
-  color: #fff;
-  border-color: #1a58c9;
-}
-.btn.primary:hover { background: #1c63da; }
-.btn.secondary { background: #fff; }
-
-/* Karten, Cards */
-.card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
-  margin-top: 16px;
-}
-
-/* Login & Controls */
-.login h2 { margin: 0 0 12px; }
-.controls { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; align-items: end; }
-.controls .row { display: flex; flex-direction: column; gap: 6px; }
-.controls .row.buttons { align-items: start; gap: 8px; }
-
-label { font-size: 13px; color: var(--muted); }
-input, select {
-  border: 1px solid var(--border);
-  background: #fff;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-}
-
-/* Info-Bar */
-.bar {
+.tabs {
   display: flex;
-  gap: 20px;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 8px 12px;
-  border-left: 4px solid #e5edff;
-  background: #f7faff;
-  border-radius: 10px;
-  margin-top: 12px;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
 }
-.saving { color: #7c3aed; font-weight: 600; }
 
-/* Tabelle */
-.table-wrapper { overflow: auto; }
-.table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 14px;
-}
-.table th, .table td {
-  text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: middle;
-}
-.table thead th {
-  position: sticky;
-  top: 0;
-  background: #fbfbfe;
-  border-bottom: 1px solid var(--border);
-  z-index: 1;
-}
-.table tbody tr:nth-child(odd) { background: #fcfcff; }
-.table tbody tr:hover { background: #f5f7ff; }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-.center { text-align: center; }
-.muted { color: var(--muted); }
-.small { font-size: 12px; }
-
-/* Spaltenbreiten (sanfte Vorgaben) */
-.table th:nth-child(1) { width: 48px; }        /* # */
-.table th:nth-child(2) { width: 120px; }       /* Ankunftszeit */
-.table th:nth-child(3) { width: 180px; }       /* Kunde */
-.table th:nth-child(4) { width: 140px; }       /* Kommission */
-.table th:nth-child(5) { min-width: 240px; }   /* Adresse */
-.table th:nth-child(6) { width: 160px; }       /* Telefon */
-.table th:nth-child(7) { min-width: 220px; }   /* Hinweis */
-.table th:nth-child(8) { min-width: 220px; }   /* Status */
-
-.tel { color: #0b57d0; text-decoration: none; }
-.tel:hover { text-decoration: underline; }
-
-/* Inline-Inputs in Zellen */
-.cell-input input {
-  width: 100%;
-  border: 1px solid #dfe3ee;
-  background: #fff;
+.tabs button {
+  padding: 10px 16px;
+  border: 1px solid #ccc;
   border-radius: 8px;
-  padding: 8px 10px;
+  background: #f9f9f9;
+  cursor: pointer;
   font-size: 14px;
 }
-.cell-input input:focus {
-  outline: none;
-  border-color: #b9c8ff;
-  box-shadow: 0 0 0 3px rgba(69, 97, 255, 0.15);
+
+.tabs button.active {
+  background: var(--primary);
+  color: white;
+  border-color: #1749b3;
 }
 
-/* Map-Container (Platzhalter, Turn-by-Turn rechts deaktiviert) */
-.map { padding: 0; }
-.map .map-placeholder {
-  height: 360px;
-  border-radius: var(--radius);
-  border: 1px dashed #cfd7ee;
-  margin: 16px;
-  display: grid;
-  place-items: center;
+.tabs .logout {
+  margin-left: auto;
+  background: #e74c3c;
+  color: white;
+  border: none;
+}
+
+/* ===================================
+   Controls / Auswahl
+=================================== */
+.controls {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.controls select,
+.controls input[type="date"] {
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.controls button {
+  padding: 8px 16px;
+  background-color: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.controls button:hover {
+  background-color: #1b61d1;
+}
+
+/* ===================================
+   Tabellenlayout (Tagestour & Woche)
+=================================== */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+th,
+td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+th {
+  background-color: var(--primary);
+  color: white;
+  font-weight: 500;
+}
+
+tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+tr:hover {
+  background-color: #eef6fc;
+}
+
+a {
+  color: #1b61d1;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ===================================
+   Wochenübersicht
+=================================== */
+.weekview {
+  margin-top: 20px;
+}
+
+.week-day-card {
+  background: white;
+  border-radius: 10px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  padding: 10px;
+}
+
+.week-day-card h3 {
+  margin: 0 0 10px;
+  background: var(--primary);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  text-align: left;
+}
+
+.week-table-container {
+  margin-top: 10px;
+}
+
+.muted {
   color: var(--muted);
+  font-size: 14px;
+}
+
+.center {
+  text-align: center;
 }
