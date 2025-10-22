@@ -1,35 +1,52 @@
 import React, { useEffect, useState } from "react";
 import "../App.css";
 
-function getWeekDates(dateStr) {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Montag als Wochenstart
-  const monday = new Date(d.setDate(diff));
-  const days = [];
-  for (let i = 0; i < 7; i++) {
-    const current = new Date(monday);
-    current.setDate(monday.getDate() + i);
-    days.push(current.toISOString().slice(0, 10));
+// Hilfsfunktion: alle Kalenderwochen mit Start/Ende generieren
+function getWeeksOfYear(year) {
+  const weeks = [];
+  const d = new Date(year, 0, 1);
+  while (d.getDay() !== 1) d.setDate(d.getDate() + 1); // Montag finden
+  let week = 1;
+  while (d.getFullYear() === year) {
+    const start = new Date(d);
+    const end = new Date(d);
+    end.setDate(start.getDate() + 6);
+    const label = `KW ${String(week).padStart(2, "0")} (${start
+      .toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+     - ${end.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })})`;
+    weeks.push({ week, start, end, label });
+    d.setDate(d.getDate() + 7);
+    week++;
   }
-  return days;
+  return weeks;
 }
 
-export default function WeekView({
-  apiUrl,
-  token,
-  fahrer,
-  selectedFahrer,
-  setSelectedFahrer,
-}) {
-  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
+export default function WeekView({ apiUrl, token, fahrer, selectedFahrer }) {
   const [wochenDaten, setWochenDaten] = useState({});
   const [loading, setLoading] = useState(false);
+  const [year] = useState(new Date().getFullYear());
+  const [weeks] = useState(() => getWeeksOfYear(new Date().getFullYear()));
 
-  const ladeWoche = async () => {
-    if (!selectedFahrer || !datum) return;
+  const currentWeek = (() => {
+    const now = new Date();
+    const week = weeks.find(
+      (w) => now >= w.start && now <= w.end
+    );
+    return week || weeks[0];
+  })();
+
+  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
+
+  const ladeWoche = async (weekObj) => {
+    if (!selectedFahrer || !weekObj) return;
     setLoading(true);
-    const tage = getWeekDates(datum);
+    const tage = [];
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(weekObj.start);
+      day.setDate(day.getDate() + i);
+      tage.push(day.toISOString().slice(0, 10));
+    }
+
     const result = {};
     for (const day of tage) {
       try {
@@ -47,31 +64,33 @@ export default function WeekView({
   };
 
   useEffect(() => {
-    ladeWoche();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFahrer, datum]);
+    ladeWoche(selectedWeek);
+  }, [selectedWeek, selectedFahrer]);
 
   return (
     <div className="weekview">
-      <div className="controls">
-        <select
-          value={selectedFahrer}
-          onChange={(e) => setSelectedFahrer(e.target.value)}
-        >
-          <option value="">Fahrer wählen</option>
-          {fahrer.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-        <input
-          type="date"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
-        />
-        <button onClick={ladeWoche}>{loading ? "Laden..." : "Woche laden"}</button>
+      <div className="kw-select-container">
+        <label>Kalenderwoche:</label>
+        <div className="kw-dropdown">
+          <select
+            size="6"
+            value={selectedWeek.label}
+            onChange={(e) =>
+              setSelectedWeek(
+                weeks.find((w) => w.label === e.target.value) || weeks[0]
+              )
+            }
+          >
+            {weeks.map((w) => (
+              <option key={w.week} value={w.label}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
+      {loading && <p className="muted">Lade Woche...</p>}
 
       <div className="week-table-container">
         {Object.keys(wochenDaten).length === 0 && !loading && (
@@ -89,27 +108,24 @@ export default function WeekView({
             <table>
               <thead>
                 <tr>
+                  <th>Fahrer</th>
                   <th>Kunde</th>
-                  <th>Adresse</th>
-                  <th>Telefon</th>
+                  <th>Kommission</th>
                   <th>Hinweis</th>
-                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {stopps.map((s, i) => (
                   <tr key={i}>
-                    <td>{s.kunde}</td>
-                    <td>{s.adresse}</td>
                     <td>
-                      {s.telefon ? (
-                        <a href={`tel:${s.telefon}`}>{s.telefon}</a>
-                      ) : (
+                      {
+                        fahrer.find((f) => f.id === selectedFahrer)?.name ||
                         "-"
-                      )}
+                      }
                     </td>
+                    <td>{s.kunde}</td>
+                    <td>{s.kommission}</td>
                     <td>{s.hinweis || "-"}</td>
-                    <td>{s.status || "-"}</td>
                   </tr>
                 ))}
               </tbody>
