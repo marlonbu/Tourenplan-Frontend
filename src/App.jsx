@@ -13,13 +13,21 @@ function App() {
 
   const apiUrl = "https://tourenplan.onrender.com";
 
-  // Login
+  // 🔑 Prüfe bei Start, ob Token vorhanden ist
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  // 🧠 Login-Funktion
   const handleLogin = async () => {
     try {
       const res = await fetch(`${apiUrl}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ username, password }),
       });
       if (!res.ok) throw new Error("Login fehlgeschlagen");
       const data = await res.json();
@@ -30,12 +38,20 @@ function App() {
     }
   };
 
-  // Fahrer laden
+  // 🚪 Logout-Funktion
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    setIsLoggedIn(false);
+    setFahrer([]);
+    setTour([]);
+  };
+
+  // 🚚 Fahrer laden (nach Login)
   useEffect(() => {
     if (isLoggedIn) {
       const token = localStorage.getItem("token");
       fetch(`${apiUrl}/fahrer`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       })
         .then((res) => res.json())
         .then(setFahrer)
@@ -43,13 +59,13 @@ function App() {
     }
   }, [isLoggedIn]);
 
-  // Tour laden
+  // 📅 Tour laden
   const ladeTour = () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
     const token = localStorage.getItem("token");
     fetch(`${apiUrl}/touren/${selectedFahrer}/${datum}`, {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => {
@@ -61,6 +77,10 @@ function App() {
         setLoading(false);
       });
   };
+
+  // =====================
+  // 🧭 RENDERING
+  // =====================
 
   return (
     <div className="App">
@@ -84,6 +104,10 @@ function App() {
       ) : (
         <>
           <h1>🚚 Tourenplan</h1>
+
+          <div className="controls">
+            <button onClick={handleLogout}>🚪 Logout</button>
+          </div>
 
           <div className="controls">
             <select
