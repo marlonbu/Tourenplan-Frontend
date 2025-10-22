@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import "../App.css";
 
-// Hilfsfunktion: alle Kalenderwochen mit Start/Ende generieren
 function getWeeksOfYear(year) {
   const weeks = [];
   const d = new Date(year, 0, 1);
@@ -11,9 +10,14 @@ function getWeeksOfYear(year) {
     const start = new Date(d);
     const end = new Date(d);
     end.setDate(start.getDate() + 6);
-    const label = `KW ${String(week).padStart(2, "0")} (${start
-      .toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-     - ${end.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })})`;
+    const label = `KW ${String(week).padStart(2, "0")} (${start.toLocaleDateString(
+      "de-DE",
+      { day: "2-digit", month: "2-digit" }
+    )} - ${end.toLocaleDateString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    })})`;
     weeks.push({ week, start, end, label });
     d.setDate(d.getDate() + 7);
     week++;
@@ -26,16 +30,39 @@ export default function WeekView({ apiUrl, token, fahrer, selectedFahrer }) {
   const [loading, setLoading] = useState(false);
   const [year] = useState(new Date().getFullYear());
   const [weeks] = useState(() => getWeeksOfYear(new Date().getFullYear()));
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
 
   const currentWeek = (() => {
     const now = new Date();
-    const week = weeks.find(
-      (w) => now >= w.start && now <= w.end
+    return (
+      weeks.find((w) => now >= w.start && now <= w.end) ||
+      weeks[Math.min(weeks.length - 1, 0)]
     );
-    return week || weeks[0];
   })();
 
-  const [selectedWeek, setSelectedWeek] = useState(currentWeek);
+  // gespeicherte KW laden oder aktuelle nehmen
+  const [selectedWeek, setSelectedWeek] = useState(() => {
+    const saved = localStorage.getItem("selectedKW");
+    const found = weeks.find((w) => w.label === saved);
+    return found || currentWeek;
+  });
+
+  // KW speichern
+  useEffect(() => {
+    if (selectedWeek) localStorage.setItem("selectedKW", selectedWeek.label);
+  }, [selectedWeek]);
+
+  // Klick außerhalb schließt Dropdown
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const ladeWoche = async (weekObj) => {
     if (!selectedFahrer || !weekObj) return;
@@ -69,25 +96,29 @@ export default function WeekView({ apiUrl, token, fahrer, selectedFahrer }) {
 
   return (
     <div className="weekview">
-      <div className="kw-select-container">
-        <label>Kalenderwoche:</label>
-        <div className="kw-dropdown">
-          <select
-            size="6"
-            value={selectedWeek.label}
-            onChange={(e) =>
-              setSelectedWeek(
-                weeks.find((w) => w.label === e.target.value) || weeks[0]
-              )
-            }
-          >
+      {/* KW Auswahl */}
+      <div className="kw-select-container" ref={dropdownRef}>
+        <button className="kw-button" onClick={() => setDropdownOpen(!dropdownOpen)}>
+          {selectedWeek.label}
+        </button>
+        {dropdownOpen && (
+          <div className="kw-dropdown-list">
             {weeks.map((w) => (
-              <option key={w.week} value={w.label}>
+              <div
+                key={w.week}
+                className={`kw-option ${
+                  w.label === selectedWeek.label ? "active" : ""
+                }`}
+                onClick={() => {
+                  setSelectedWeek(w);
+                  setDropdownOpen(false);
+                }}
+              >
                 {w.label}
-              </option>
+              </div>
             ))}
-          </select>
-        </div>
+          </div>
+        )}
       </div>
 
       {loading && <p className="muted">Lade Woche...</p>}
@@ -118,10 +149,7 @@ export default function WeekView({ apiUrl, token, fahrer, selectedFahrer }) {
                 {stopps.map((s, i) => (
                   <tr key={i}>
                     <td>
-                      {
-                        fahrer.find((f) => f.id === selectedFahrer)?.name ||
-                        "-"
-                      }
+                      {fahrer.find((f) => f.id === selectedFahrer)?.name || "-"}
                     </td>
                     <td>{s.kunde}</td>
                     <td>{s.kommission}</td>
