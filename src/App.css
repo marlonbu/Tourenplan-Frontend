@@ -1,3 +1,6 @@
+/* ===================================
+   Grundlayout & Farbvariablen
+=================================== */
 :root {
   --bg: #f7f7fb;
   --card: #ffffff;
@@ -9,28 +12,80 @@
   --radius: 12px;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
 
 body {
   margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: var(--bg);
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji",
+    "Segoe UI Emoji";
+  background: var(--bg);
   color: var(--text);
 }
 
 .App {
   max-width: 1200px;
-  margin: auto;
-  padding: 20px;
+  margin: 30px auto 60px;
+  padding: 0 16px;
   text-align: center;
 }
 
-h1 {
-  margin-bottom: 20px;
-  color: #2c3e50;
+/* ===================================
+   Login
+=================================== */
+.login-container {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 30px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
 }
 
-/* Tabs */
+.login-container h2 {
+  margin-bottom: 20px;
+}
+
+.login-container input {
+  width: 80%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.login-container button {
+  padding: 10px 20px;
+  background-color: var(--primary);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.login-container button:hover {
+  background-color: #1749b3;
+}
+
+/* ===================================
+   Header / Tabs / Logout
+=================================== */
+h1 {
+  color: #2c3e50;
+  margin-bottom: 16px;
+}
+
 .tabs {
   display: flex;
   justify-content: center;
@@ -45,12 +100,13 @@ h1 {
   background: #f9f9f9;
   cursor: pointer;
   font-size: 14px;
+  transition: background 0.2s ease;
 }
 
 .tabs button.active {
-  background: #3498db;
+  background: var(--primary);
   color: white;
-  border-color: #2980b9;
+  border-color: #1749b3;
 }
 
 .tabs .logout {
@@ -60,13 +116,15 @@ h1 {
   border: none;
 }
 
-/* Controls */
+/* ===================================
+   Controls / Auswahl (Tagestour)
+=================================== */
 .controls {
-  margin: 15px 0;
+  margin: 20px 0;
   display: flex;
   justify-content: center;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 .controls select,
@@ -79,38 +137,43 @@ h1 {
 
 .controls button {
   padding: 8px 16px;
-  background-color: #3498db;
+  background-color: var(--primary);
   border: none;
   border-radius: 8px;
   color: white;
   font-size: 14px;
   cursor: pointer;
+  transition: background 0.3s ease;
 }
 
 .controls button:hover {
   background-color: #1b61d1;
 }
 
-/* Tabellen */
+/* ===================================
+   Tabellenlayout (Tagestour & Woche)
+=================================== */
 table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  margin-top: 20px;
   background: white;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: var(--shadow);
 }
 
-th, td {
+th,
+td {
   padding: 12px;
   text-align: left;
   border-bottom: 1px solid #eee;
 }
 
 th {
-  background-color: #3498db;
+  background-color: var(--primary);
   color: white;
+  font-weight: 500;
 }
 
 tr:nth-child(even) {
@@ -121,38 +184,20 @@ tr:hover {
   background-color: #eef6fc;
 }
 
-.muted { color: var(--muted); }
+a {
+  color: #1b61d1;
+  text-decoration: none;
+}
 
-/* Wochenübersicht */
+a:hover {
+  text-decoration: underline;
+}
+
+/* ===================================
+   Wochenübersicht
+=================================== */
 .weekview {
   margin-top: 20px;
-}
-
-.kw-select-container {
-  margin-bottom: 20px;
-}
-
-.kw-dropdown select {
-  width: 260px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-  padding: 6px;
-  font-size: 14px;
-  height: auto;
-  max-height: 180px; /* nur 5–6 sichtbar */
-  overflow-y: scroll;
-}
-
-/* Scrollbar styling */
-.kw-dropdown select::-webkit-scrollbar {
-  width: 8px;
-}
-.kw-dropdown select::-webkit-scrollbar-thumb {
-  background: #c0c0c0;
-  border-radius: 4px;
-}
-.kw-dropdown select::-webkit-scrollbar-thumb:hover {
-  background: #999;
 }
 
 .week-day-card {
@@ -165,9 +210,93 @@ tr:hover {
 
 .week-day-card h3 {
   margin: 0 0 10px;
-  background: #3498db;
+  background: var(--primary);
   color: white;
   padding: 6px 12px;
   border-radius: 6px;
   text-align: left;
+}
+
+.week-table-container {
+  margin-top: 10px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.center {
+  text-align: center;
+}
+
+/* ===================================
+   Kalenderwochen-Auswahl (Dropdown)
+=================================== */
+.kw-select-container {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+
+.kw-button {
+  padding: 10px 16px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background: #3498db;
+  color: white;
+  cursor: pointer;
+  min-width: 260px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.kw-button:hover {
+  background: #2f7fce;
+}
+
+/* Dropdown */
+.kw-dropdown-list {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  width: 260px;
+  background: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  max-height: 200px; /* ca. 6 Einträge sichtbar */
+  overflow-y: auto;
+  z-index: 100;
+  text-align: left;
+}
+
+.kw-option {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #f2f2f2;
+}
+
+.kw-option:hover {
+  background: #eef6fc;
+}
+
+.kw-option.active {
+  background: #3498db;
+  color: white;
+}
+
+/* Scrollbar Styling */
+.kw-dropdown-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.kw-dropdown-list::-webkit-scrollbar-thumb {
+  background: #c0c0c0;
+  border-radius: 4px;
+}
+
+.kw-dropdown-list::-webkit-scrollbar-thumb:hover {
+  background: #999;
 }
