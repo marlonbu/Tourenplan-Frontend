@@ -11,13 +11,13 @@ function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
-  const [activeTab, setActiveTab] = useState("tagestour");
+  const [activeTab, setActiveTab] = useState("wochen"); // Wochenübersicht zuerst aktiv
   const [tourData, setTourData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const isLoggedIn = !!token;
 
-  // 🔑 Token aus localStorage
+  // 🔑 Token aus localStorage laden
   useEffect(() => {
     const t = localStorage.getItem("tourenplan_token");
     if (t) setToken(t);
@@ -103,19 +103,19 @@ function App() {
         <>
           <h1>🚚 Tourenplan</h1>
 
-          {/* Tabs */}
+          {/* Tabs getauscht */}
           <div className="tabs">
-            <button
-              className={activeTab === "tagestour" ? "active" : ""}
-              onClick={() => setActiveTab("tagestour")}
-            >
-              Tagestour
-            </button>
             <button
               className={activeTab === "wochen" ? "active" : ""}
               onClick={() => setActiveTab("wochen")}
             >
               Wochenübersicht
+            </button>
+            <button
+              className={activeTab === "tagestour" ? "active" : ""}
+              onClick={() => setActiveTab("tagestour")}
+            >
+              Tagestour
             </button>
             <button className="logout" onClick={handleLogout}>
               Logout
@@ -185,7 +185,6 @@ function App() {
               token={token}
               fahrer={fahrer}
               selectedFahrer={selectedFahrer}
-              setSelectedFahrer={setSelectedFahrer}
             />
           )}
         </>
