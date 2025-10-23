@@ -1,137 +1,124 @@
-import React, { useEffect, useRef } from "react";
-import { MapContainer, TileLayer } from "react-leaflet";
+import { useEffect, useRef, useState } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 import "leaflet-routing-machine";
+import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
 
-/**
- * MapView
- * - Zeigt OSM-Karte mit Routing von Start-Adresse bis zum letzten Stopp
- * - Adressen werden per Nominatim (OSM) in Koordinaten geokodiert (kein API-Key nötig)
- * - Routing über OSRM (Leaflet Routing Machine) -> echte Straßenroute
- *
- * Props:
- * - startAddress: string (Abfahrtsort, z.B. "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern")
- * - stops: Array<{ id:number, adresse:string, kunde?:string }>
- * - visible: boolean (Karte anzeigen/ausblenden)
- */
-export default function MapView({ startAddress, stops = [], visible = true }) {
+const MapView = ({ stops }) => {
   const mapRef = useRef(null);
-  const routingRef = useRef(null);
+  const [mapReady, setMapReady] = useState(false);
 
-  // Hilfsfunktion: Adresse -> {lat,lng} via Nominatim
-  const geocode = async (address) => {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-      address
-    )}`;
-    const res = await fetch(url, {
-      headers: {
-        // höfliche Identifikation
-        "Accept-Language": "de",
-      },
-    });
-    const data = await res.json();
-    if (data && data[0]) {
-      return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-      };
+  // Firmenadresse als Startpunkt
+  const startAddress = "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern";
+
+  // Geocoding Funktion (Adresse → Koordinaten)
+  const getCoords = async (address) => {
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        address
+      )}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data && data.length > 0) {
+        return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+      } else {
+        console.warn("Keine Koordinaten gefunden für:", address);
+        return null;
+      }
+    } catch (err) {
+      console.error("Fehler beim Geocoding:", err);
+      return null;
     }
-    return null;
   };
 
   useEffect(() => {
-    if (!visible) return;
+    if (!stops || stops.length === 0) return;
 
-    let isCancelled = false;
-
-    const setupRouting = async () => {
-      if (!mapRef.current) return;
-      // Karte-Instanz aus react-leaflet holen
-      const map = mapRef.current;
-
-      // Waypoints per Geocoding bauen (Start + alle Stopps in Reihenfolge)
-      const waypoints = [];
-      const start = await geocode(startAddress);
-      if (isCancelled) return;
-
-      if (start) waypoints.push(L.latLng(start.lat, start.lng));
-
-      for (const s of stops) {
-        const pos = await geocode(s.adresse);
-        if (isCancelled) return;
-        if (pos) waypoints.push(L.latLng(pos.lat, pos.lng));
+    const initMap = async () => {
+      // Existierende Karte entfernen (wenn bereits vorhanden)
+      if (mapRef.current) {
+        mapRef.current.remove();
       }
 
-      // Wenn weniger als 2 Punkte vorhanden, abbrechen (kein Routing möglich)
-      if (waypoints.length < 2) {
-        // ggf. nur auf Start zoomen
-        if (start) {
-          map.setView([start.lat, start.lng], 12);
+      // Karte initialisieren (Start auf Lindern)
+      const map = L.map("map", {
+        center: [52.8412721, 7.7702298],
+        zoom: 9,
+      });
+      mapRef.current = map;
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      // Warte auf alle Koordinaten (Start + Stopps)
+      const waypoints = [];
+
+      // Startpunkt hinzufügen
+      const startCoords = await getCoords(startAddress);
+      if (startCoords) {
+        waypoints.push(L.latLng(startCoords[0], startCoords[1]));
+        L.marker(startCoords)
+          .addTo(map)
+          .bindPopup("Start: Hans Gehlenborg GmbH")
+          .openPopup();
+      }
+
+      // Stopps nacheinander auflösen
+      for (const stop of stops) {
+        if (stop.adresse) {
+          const coords = await getCoords(stop.adresse);
+          if (coords) {
+            waypoints.push(L.latLng(coords[0], coords[1]));
+            L.marker(coords)
+              .addTo(map)
+              .bindPopup(`${stop.kunde || "Kunde"}<br/>${stop.adresse}`);
+          }
         }
+      }
+
+      // Wenn keine gültigen Wegpunkte → abbrechen
+      if (waypoints.length < 2) {
+        console.warn("Nicht genug Wegpunkte für Routing.");
         return;
       }
 
-      // Bereits existierende Route entfernen
-      if (routingRef.current) {
-        map.removeControl(routingRef.current);
-        routingRef.current = null;
-      }
+      // Routing erst starten, wenn alles fertig ist
+      setTimeout(() => {
+        L.Routing.control({
+          waypoints,
+          routeWhileDragging: false,
+          lineOptions: {
+            styles: [{ color: "#007bff", weight: 5 }],
+          },
+          createMarker: () => null, // keine extra Marker vom Routing-Plugin
+        }).addTo(map);
+      }, 500); // kleine Verzögerung für stabileren Aufbau
 
-      // Routing Control hinzufügen
-      const control = L.Routing.control({
-        waypoints,
-        addWaypoints: false,
-        routeWhileDragging: false,
-        draggableWaypoints: false,
-        fitSelectedRoutes: true,
-        show: false,
-        lineOptions: {
-          styles: [{ color: "#1f6feb", opacity: 0.9, weight: 6 }],
-        },
-        router: L.Routing.osrmv1({
-          serviceUrl: "https://router.project-osrm.org/route/v1",
-          profile: "driving",
-          language: "de",
-        }),
-        createMarker: function(i, wp) {
-          // Standard-Marker, Popups optional
-          return L.marker(wp.latLng);
-        },
-      });
-
-      control.addTo(map);
-      routingRef.current = control;
+      setMapReady(true);
     };
 
-    setupRouting();
+    initMap();
+  }, [stops]);
 
-    return () => {
-      isCancelled = true;
-      if (routingRef.current && mapRef.current) {
-        try {
-          mapRef.current.removeControl(routingRef.current);
-        } catch (_) {}
-        routingRef.current = null;
-      }
-    };
-  }, [visible, startAddress, JSON.stringify(stops)]);
-
-  // Leaflet MapContainer braucht Zentrum/Zoom, wird aber von Routing überschrieben
   return (
-    <div className="map-card" style={{ display: visible ? "block" : "none" }}>
-      <MapContainer
-        className="map-container"
-        center={[52.85, 7.77]}  // Fallback: Nähe Lindern
-        zoom={12}
-        whenCreated={(map) => (mapRef.current = map)}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-      </MapContainer>
+    <div style={{ width: "100%", height: "400px", marginTop: "1rem" }}>
+      <div
+        id="map"
+        style={{
+          width: "100%",
+          height: "100%",
+          borderRadius: "12px",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.2)",
+        }}
+      ></div>
+      {!mapReady && (
+        <p style={{ textAlign: "center", marginTop: "8px", color: "#555" }}>
+          Karte wird geladen...
+        </p>
+      )}
     </div>
   );
-}
+};
+
+export default MapView;
