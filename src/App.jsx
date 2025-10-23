@@ -11,20 +11,56 @@ function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
-  const [activeTab, setActiveTab] = useState("wochen"); // Wochenübersicht links zuerst
+  const [activeTab, setActiveTab] = useState("wochen");
   const [tourData, setTourData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const isLoggedIn = !!token;
 
-  // Referenzen für versteckte File-Inputs je Stopp
-  const fileInputsRef = useRef({}); // { [stoppId]: input }
+  // Referenzen für Kamera-Inputs
+  const fileInputsRef = useRef({});
+  // Timer für automatisches Logout
+  const logoutTimerRef = useRef(null);
 
+  // 🕒 1 Stunde = 60 Minuten
+  const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
+
+  // -------------------------------------------------------------------
+  // 🧭 Automatischer Logout bei Inaktivität
+  // -------------------------------------------------------------------
+  useEffect(() => {
+    if (!isLoggedIn) return;
+
+    const resetTimer = () => {
+      clearTimeout(logoutTimerRef.current);
+      logoutTimerRef.current = setTimeout(() => {
+        handleLogout(true); // true = automatisch ausgeloggt
+      }, INACTIVITY_LIMIT_MS);
+    };
+
+    // Aktivitätsereignisse abhören
+    const activityEvents = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    activityEvents.forEach((e) => window.addEventListener(e, resetTimer));
+
+    resetTimer(); // Timer initial starten
+
+    return () => {
+      clearTimeout(logoutTimerRef.current);
+      activityEvents.forEach((e) => window.removeEventListener(e, resetTimer));
+    };
+  }, [isLoggedIn]);
+
+  // -------------------------------------------------------------------
+  // 🔐 Login aus LocalStorage laden
+  // -------------------------------------------------------------------
   useEffect(() => {
     const t = localStorage.getItem("tourenplan_token");
     if (t) setToken(t);
   }, []);
 
+  // -------------------------------------------------------------------
+  // 🚚 Fahrer laden
+  // -------------------------------------------------------------------
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch(`${API_URL}/fahrer`, {
@@ -38,6 +74,9 @@ function App() {
       .catch((err) => console.error(err));
   }, [isLoggedIn]);
 
+  // -------------------------------------------------------------------
+  // 📅 Tour laden
+  // -------------------------------------------------------------------
   const ladeTagestour = async () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
@@ -55,6 +94,9 @@ function App() {
     }
   };
 
+  // -------------------------------------------------------------------
+  // 🔑 Login / Logout
+  // -------------------------------------------------------------------
   const handleLogin = async () => {
     try {
       const res = await fetch(`${API_URL}/login`, {
@@ -71,21 +113,24 @@ function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = (auto = false) => {
     localStorage.removeItem("tourenplan_token");
     setToken("");
     setFahrer([]);
     setSelectedFahrer("");
     setTourData([]);
+    clearTimeout(logoutTimerRef.current);
+    if (auto) alert("🔒 Sitzung abgelaufen – bitte neu anmelden.");
   };
 
-  // 📷 Upload-Trigger: öffnet den versteckten Datei-Input (Kamera)
+  // -------------------------------------------------------------------
+  // 📷 Foto-Upload
+  // -------------------------------------------------------------------
   const openCameraForStopp = (stoppId) => {
     const input = fileInputsRef.current[stoppId];
     if (input) input.click();
   };
 
-  // 📷 Upload-Handler
   const handlePhotoSelected = async (stoppId, file) => {
     if (!file) return;
     try {
@@ -99,14 +144,15 @@ function App() {
       if (!res.ok) throw new Error("Upload fehlgeschlagen");
       await res.json();
       alert("📷 Foto gespeichert");
-      // Optional: Tagestour neu laden (falls du später Foto-Status anzeigen willst)
-      // await ladeTagestour();
     } catch (e) {
       console.error(e);
       alert("Foto-Upload fehlgeschlagen.");
     }
   };
 
+  // -------------------------------------------------------------------
+  // 📱 UI Rendering
+  // -------------------------------------------------------------------
   return (
     <div className="App">
       {!isLoggedIn ? (
@@ -130,7 +176,7 @@ function App() {
         <>
           <h1>🚚 Tourenplan</h1>
 
-          {/* Tabs: Wochenübersicht links, Tagestour rechts */}
+          {/* Tabs */}
           <div className="tabs">
             <button
               className={activeTab === "wochen" ? "active" : ""}
@@ -144,7 +190,7 @@ function App() {
             >
               Tagestour
             </button>
-            <button className="logout" onClick={handleLogout}>
+            <button className="logout" onClick={() => handleLogout(false)}>
               Logout
             </button>
           </div>
@@ -192,7 +238,9 @@ function App() {
                         <td>{s.adresse}</td>
                         <td>
                           {s.telefon ? (
-                            <a href={`tel:${String(s.telefon).replace(/[^\d+]/g, "")}`}>{s.telefon}</a>
+                            <a href={`tel:${String(s.telefon).replace(/[^\d+]/g, "")}`}>
+                              {s.telefon}
+                            </a>
                           ) : (
                             "-"
                           )}
@@ -200,7 +248,6 @@ function App() {
                         <td>{s.hinweis || "-"}</td>
                         <td>{s.status || "-"}</td>
                         <td>
-                          {/* Versteckter Input pro Stopp (öffnet Kamera auf Mobilgeräten) */}
                           <input
                             ref={(el) => (fileInputsRef.current[s.id] = el)}
                             type="file"
