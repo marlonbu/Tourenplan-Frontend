@@ -16,8 +16,8 @@ function App() {
   const [weeks, setWeeks] = useState([]);
   const [wochenTouren, setWochenTouren] = useState([]);
   const [showWeekDropdown, setShowWeekDropdown] = useState(false);
-
   const dropdownRef = useRef(null);
+  const listRef = useRef(null);
 
   // ---------------------------------------------------------
   // 🔑 Login
@@ -213,6 +213,19 @@ function App() {
   }, []);
 
   // ---------------------------------------------------------
+  // 📜 Automatisch zur aktuellen KW scrollen
+  // ---------------------------------------------------------
+  useEffect(() => {
+    if (showWeekDropdown && listRef.current) {
+      const selectedIndex = weeks.findIndex((w) => w.value === selectedWeek);
+      if (selectedIndex >= 0) {
+        const itemHeight = 40; // ungefährer Zeilenwert
+        listRef.current.scrollTop = selectedIndex * itemHeight - 80;
+      }
+    }
+  }, [showWeekDropdown, weeks, selectedWeek]);
+
+  // ---------------------------------------------------------
   // 🔒 Login-Ansicht
   // ---------------------------------------------------------
   if (!token) {
@@ -245,24 +258,25 @@ function App() {
           </button>
         </div>
 
-        {showWeekDropdown && (
-          <div className="week-dropdown-list">
-            {weeks.map((w) => (
-              <div
-                key={w.value}
-                className={`week-option ${
-                  w.value === selectedWeek ? "selected" : ""
-                }`}
-                onClick={() => {
-                  setSelectedWeek(w.value);
-                  setShowWeekDropdown(false);
-                }}
-              >
-                {w.label}
-              </div>
-            ))}
-          </div>
-        )}
+        <div
+          ref={listRef}
+          className={`week-dropdown-list ${showWeekDropdown ? "visible" : "hidden"}`}
+        >
+          {weeks.map((w) => (
+            <div
+              key={w.value}
+              className={`week-option ${
+                w.value === selectedWeek ? "selected" : ""
+              }`}
+              onClick={() => {
+                setSelectedWeek(w.value);
+                setShowWeekDropdown(false);
+              }}
+            >
+              {w.label}
+            </div>
+          ))}
+        </div>
       </div>
 
       {wochenTouren.length > 0 ? (
