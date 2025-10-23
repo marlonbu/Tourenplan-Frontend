@@ -14,6 +14,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [weeks, setWeeks] = useState([]);
+  const [wochenTouren, setWochenTouren] = useState([]);
 
   // ---------------------------------------------------------
   // 🔑 Login
@@ -39,7 +40,7 @@ function App() {
   };
 
   // ---------------------------------------------------------
-  // 📅 Wochen generieren
+  // 📅 Wochen generieren (Mo–So)
   // ---------------------------------------------------------
   useEffect(() => {
     const now = new Date();
@@ -70,7 +71,7 @@ function App() {
       });
     }
 
-    // aktuelle KW bestimmen
+    // Aktuelle KW bestimmen
     const currentWeek = Math.ceil(
       ((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7
     );
@@ -107,9 +108,7 @@ function App() {
     try {
       const res = await fetch(
         `https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       if (res.status === 401) {
         localStorage.removeItem("token");
@@ -160,7 +159,32 @@ function App() {
   };
 
   // ---------------------------------------------------------
-  // ⏰ Auto-Logout nach 60 Minuten
+  // 🗓️ Wochenübersicht-Daten laden
+  // ---------------------------------------------------------
+  const ladeWochenTouren = async (kw) => {
+    try {
+      const res = await fetch(
+        `https://tourenplan.onrender.com/touren-woche/${kw}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        setToken("");
+        return;
+      }
+      const data = await res.json();
+      setWochenTouren(data.touren || []);
+    } catch (err) {
+      console.error("Fehler beim Laden der Wochenübersicht:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedWeek) ladeWochenTouren(selectedWeek);
+  }, [selectedWeek]);
+
+  // ---------------------------------------------------------
+  // ⏰ Auto-Logout
   // ---------------------------------------------------------
   useEffect(() => {
     if (!token) return;
@@ -210,26 +234,33 @@ function App() {
           </select>
         </div>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th>Fahrer</th>
-            <th>Kunde</th>
-            <th>Kommission</th>
-            <th>Hinweis</th>
-          </tr>
-        </thead>
-        <tbody>
-          {stopps.map((s) => (
-            <tr key={s.id}>
-              <td>{tour?.fahrer_name || "-"}</td>
-              <td>{s.kunde}</td>
-              <td>{s.kommission}</td>
-              <td>{s.hinweis}</td>
+
+      {wochenTouren.length > 0 ? (
+        <table>
+          <thead>
+            <tr>
+              <th>Datum</th>
+              <th>Fahrer</th>
+              <th>Kunde</th>
+              <th>Kommission</th>
+              <th>Hinweis</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {wochenTouren.map((t, idx) => (
+              <tr key={idx}>
+                <td>{new Date(t.datum).toLocaleDateString()}</td>
+                <td>{t.fahrer}</td>
+                <td>{t.kunde}</td>
+                <td>{t.kommission}</td>
+                <td>{t.hinweis}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <p>Keine Tourdaten für diese Woche gefunden.</p>
+      )}
     </div>
   );
 
@@ -307,13 +338,7 @@ function App() {
                     <td>{s.kunde}</td>
                     <td>{s.adresse}</td>
                     <td>{s.kommission}</td>
-                    <td>
-                      {s.telefon ? (
-                        <a href={`tel:${s.telefon}`}>{s.telefon}</a>
-                      ) : (
-                        "-"
-                      )}
-                    </td>
+                    <td>{s.telefon ? <a href={`tel:${s.telefon}`}>{s.telefon}</a> : "-"}</td>
                     <td>{s.hinweis}</td>
                     <td>{s.status}</td>
                     <td>📷</td>
