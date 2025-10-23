@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import WeekView from "./components/WeekView";
+import MapView from "./components/MapView";
 
 const API_URL = "https://tourenplan.onrender.com";
+const START_ADDRESS = "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern";
 
 function App() {
   const [username, setUsername] = useState("");
@@ -14,53 +16,39 @@ function App() {
   const [activeTab, setActiveTab] = useState("wochen");
   const [tourData, setTourData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showMap, setShowMap] = useState(true); // Karte standardmäßig sichtbar
 
   const isLoggedIn = !!token;
 
   // Referenzen für Kamera-Inputs
   const fileInputsRef = useRef({});
-  // Timer für automatisches Logout
+  // Auto-Logout
   const logoutTimerRef = useRef(null);
-
-  // 🕒 1 Stunde = 60 Minuten
   const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
 
-  // -------------------------------------------------------------------
-  // 🧭 Automatischer Logout bei Inaktivität
-  // -------------------------------------------------------------------
+  // Auto-Logout bei Inaktivität
   useEffect(() => {
     if (!isLoggedIn) return;
-
     const resetTimer = () => {
       clearTimeout(logoutTimerRef.current);
-      logoutTimerRef.current = setTimeout(() => {
-        handleLogout(true); // true = automatisch ausgeloggt
-      }, INACTIVITY_LIMIT_MS);
+      logoutTimerRef.current = setTimeout(() => handleLogout(true), INACTIVITY_LIMIT_MS);
     };
-
-    // Aktivitätsereignisse abhören
-    const activityEvents = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
-    activityEvents.forEach((e) => window.addEventListener(e, resetTimer));
-
-    resetTimer(); // Timer initial starten
-
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+    events.forEach((e) => window.addEventListener(e, resetTimer));
+    resetTimer();
     return () => {
       clearTimeout(logoutTimerRef.current);
-      activityEvents.forEach((e) => window.removeEventListener(e, resetTimer));
+      events.forEach((e) => window.removeEventListener(e, resetTimer));
     };
   }, [isLoggedIn]);
 
-  // -------------------------------------------------------------------
-  // 🔐 Login aus LocalStorage laden
-  // -------------------------------------------------------------------
+  // Token laden
   useEffect(() => {
     const t = localStorage.getItem("tourenplan_token");
     if (t) setToken(t);
   }, []);
 
-  // -------------------------------------------------------------------
-  // 🚚 Fahrer laden
-  // -------------------------------------------------------------------
+  // Fahrer laden
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch(`${API_URL}/fahrer`, {
@@ -74,9 +62,7 @@ function App() {
       .catch((err) => console.error(err));
   }, [isLoggedIn]);
 
-  // -------------------------------------------------------------------
-  // 📅 Tour laden
-  // -------------------------------------------------------------------
+  // Tagestour laden
   const ladeTagestour = async () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
@@ -94,9 +80,7 @@ function App() {
     }
   };
 
-  // -------------------------------------------------------------------
-  // 🔑 Login / Logout
-  // -------------------------------------------------------------------
+  // Login / Logout
   const handleLogin = async () => {
     try {
       const res = await fetch(`${API_URL}/login`, {
@@ -123,9 +107,7 @@ function App() {
     if (auto) alert("🔒 Sitzung abgelaufen – bitte neu anmelden.");
   };
 
-  // -------------------------------------------------------------------
-  // 📷 Foto-Upload
-  // -------------------------------------------------------------------
+  // Foto-Upload
   const openCameraForStopp = (stoppId) => {
     const input = fileInputsRef.current[stoppId];
     if (input) input.click();
@@ -150,9 +132,16 @@ function App() {
     }
   };
 
-  // -------------------------------------------------------------------
-  // 📱 UI Rendering
-  // -------------------------------------------------------------------
+  // Google-Maps-URL mit Textadressen (Start + Stopps)
+  const googleMapsRouteUrl = () => {
+    if (!tourData?.length) return null;
+    const parts = [
+      START_ADDRESS,
+      ...tourData.map((s) => s.adresse),
+    ].map((a) => encodeURIComponent(a));
+    return `https://www.google.com/maps/dir/${parts.join("/")}`;
+  };
+
   return (
     <div className="App">
       {!isLoggedIn ? (
@@ -220,55 +209,85 @@ function App() {
               </div>
 
               {tourData.length > 0 && (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Kunde</th>
-                      <th>Adresse</th>
-                      <th>Telefon</th>
-                      <th>Hinweis</th>
-                      <th>Status</th>
-                      <th>Foto</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tourData.map((s) => (
-                      <tr key={s.id}>
-                        <td>{s.kunde}</td>
-                        <td>{s.adresse}</td>
-                        <td>
-                          {s.telefon ? (
-                            <a href={`tel:${String(s.telefon).replace(/[^\d+]/g, "")}`}>
-                              {s.telefon}
-                            </a>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
-                        <td>{s.hinweis || "-"}</td>
-                        <td>{s.status || "-"}</td>
-                        <td>
-                          <input
-                            ref={(el) => (fileInputsRef.current[s.id] = el)}
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            style={{ display: "none" }}
-                            onChange={(e) => handlePhotoSelected(s.id, e.target.files?.[0])}
-                          />
-                          <button
-                            type="button"
-                            className="photo-btn"
-                            title="Foto aufnehmen"
-                            onClick={() => openCameraForStopp(s.id)}
-                          >
-                            📷
-                          </button>
-                        </td>
+                <>
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Kunde</th>
+                        <th>Adresse</th>
+                        <th>Telefon</th>
+                        <th>Hinweis</th>
+                        <th>Status</th>
+                        <th>Foto</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {tourData.map((s) => (
+                        <tr key={s.id}>
+                          <td>{s.kunde}</td>
+                          <td>{s.adresse}</td>
+                          <td>
+                            {s.telefon ? (
+                              <a href={`tel:${String(s.telefon).replace(/[^\d+]/g, "")}`}>
+                                {s.telefon}
+                              </a>
+                            ) : (
+                              "-"
+                            )}
+                          </td>
+                          <td>{s.hinweis || "-"}</td>
+                          <td>{s.status || "-"}</td>
+                          <td>
+                            <input
+                              ref={(el) => (fileInputsRef.current[s.id] = el)}
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              style={{ display: "none" }}
+                              onChange={(e) => handlePhotoSelected(s.id, e.target.files?.[0])}
+                            />
+                            <button
+                              type="button"
+                              className="photo-btn"
+                              title="Foto aufnehmen"
+                              onClick={() => openCameraForStopp(s.id)}
+                            >
+                              📷
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Karten-Buttons */}
+                  <div className="map-actions">
+                    <button className="btn" onClick={() => setShowMap((v) => !v)}>
+                      {showMap ? "🗺️ Karte ausblenden" : "🗺️ Karte anzeigen"}
+                    </button>
+                    {googleMapsRouteUrl() && (
+                      <a
+                        className="btn"
+                        href={googleMapsRouteUrl()}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        🧭 Tour in Google Maps öffnen
+                      </a>
+                    )}
+                  </div>
+
+                  {/* Karte */}
+                  <MapView
+                    startAddress={START_ADDRESS}
+                    stops={tourData}
+                    visible={showMap}
+                  />
+                </>
+              )}
+
+              {tourData.length === 0 && !loading && (
+                <p className="muted">Keine Stopps geladen. Bitte Fahrer & Datum wählen und „Tour laden“ klicken.</p>
               )}
             </>
           )}
