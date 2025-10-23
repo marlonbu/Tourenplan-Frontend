@@ -3,6 +3,7 @@ import "./App.css";
 import MapView from "./components/MapView";
 
 function App() {
+  const [activeTab, setActiveTab] = useState("tagestour");
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
@@ -10,7 +11,7 @@ function App() {
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
   const [showMap, setShowMap] = useState(true);
-  const [message, setMessage] = useState(""); // ✅ Neue Erfolgsmeldung
+  const [message, setMessage] = useState("");
 
   // ---------------------------------------------------------
   // Login-Funktion
@@ -43,8 +44,15 @@ function App() {
     fetch("https://tourenplan.onrender.com/fahrer", {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then((res) => res.json())
-      .then((data) => setFahrer(data))
+      .then((res) => {
+        if (res.status === 401) {
+          localStorage.removeItem("token");
+          setToken("");
+          return [];
+        }
+        return res.json();
+      })
+      .then((data) => Array.isArray(data) && setFahrer(data))
       .catch((err) => console.error("Fehler beim Laden der Fahrer:", err));
   }, [token]);
 
@@ -60,6 +68,11 @@ function App() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        setToken("");
+        return;
+      }
       const data = await res.json();
       setTour(data.tour);
       setStopps(data.stopps || []);
@@ -84,7 +97,7 @@ function App() {
         headers: { Authorization: `Bearer ${token}` },
       });
       setMessage("✅ Demo erfolgreich aktualisiert");
-      setTimeout(() => setMessage(""), 3000); // Nachricht nach 3s ausblenden
+      setTimeout(() => setMessage(""), 3000);
       ladeTour();
     } catch (err) {
       console.error("Fehler beim Neuladen der Demo:", err);
@@ -131,80 +144,113 @@ function App() {
     );
   }
 
+  // ---------------------------------------------------------
+  // Wochenübersicht (Dummy – kommt später mit Daten)
+  // ---------------------------------------------------------
+  const Wochenuebersicht = () => (
+    <div className="wochenuebersicht">
+      <h2>Wochenübersicht</h2>
+      <p>Hier erscheint später die Übersicht aller Touren der Woche.</p>
+    </div>
+  );
+
+  // ---------------------------------------------------------
+  // Haupt-Render
+  // ---------------------------------------------------------
   return (
     <div className="app-container">
       <h1>🚚 Tourenplan</h1>
 
-      <div className="controls">
-        <select
-          value={selectedFahrer}
-          onChange={(e) => setSelectedFahrer(e.target.value)}
+      <div className="tabs">
+        <button
+          className={activeTab === "tagestour" ? "active" : ""}
+          onClick={() => setActiveTab("tagestour")}
         >
-          <option value="">Fahrer wählen...</option>
-          {fahrer.map((f) => (
-            <option key={f.id} value={f.id}>
-              {f.name}
-            </option>
-          ))}
-        </select>
-
-        <input
-          type="date"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
-        />
-
-        <button onClick={ladeTour}>Tour laden</button>
-        <button onClick={demoNeuLaden}>🔄 Demo neu laden</button>
-
-        {/* ✅ Erfolgsmeldung direkt unter dem Button */}
-        {message && <p className="success-message">{message}</p>}
-
-        <button onClick={openInGoogleMaps}>🧭 Tour in Google Maps öffnen</button>
-
-        <button onClick={() => setShowMap(!showMap)}>
-          {showMap ? "🗺️ Karte ausblenden" : "🗺️ Karte anzeigen"}
+          Tagestour
+        </button>
+        <button
+          className={activeTab === "wochen" ? "active" : ""}
+          onClick={() => setActiveTab("wochen")}
+        >
+          Wochenübersicht
         </button>
       </div>
 
-      {stopps.length > 0 ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Kunde</th>
-              <th>Adresse</th>
-              <th>Kommission</th>
-              <th>Telefon</th>
-              <th>Hinweis</th>
-              <th>Status</th>
-              <th>Foto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {stopps.map((s) => (
-              <tr key={s.id}>
-                <td>{s.kunde}</td>
-                <td>{s.adresse}</td>
-                <td>{s.kommission}</td>
-                <td>
-                  {s.telefon ? (
-                    <a href={`tel:${s.telefon}`}>{s.telefon}</a>
-                  ) : (
-                    "-"
-                  )}
-                </td>
-                <td>{s.hinweis}</td>
-                <td>{s.status}</td>
-                <td>📷</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>Keine Tourdaten verfügbar</p>
+      {activeTab === "tagestour" && (
+        <>
+          <div className="controls">
+            <select
+              value={selectedFahrer}
+              onChange={(e) => setSelectedFahrer(e.target.value)}
+            >
+              <option value="">Fahrer wählen...</option>
+              {fahrer.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+
+            <input
+              type="date"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+            />
+
+            <button onClick={ladeTour}>Tour laden</button>
+            <button onClick={demoNeuLaden}>🔄 Demo neu laden</button>
+
+            {message && <p className="success-message">{message}</p>}
+
+            <button onClick={openInGoogleMaps}>🧭 Tour in Google Maps öffnen</button>
+
+            <button onClick={() => setShowMap(!showMap)}>
+              {showMap ? "🗺️ Karte ausblenden" : "🗺️ Karte anzeigen"}
+            </button>
+          </div>
+
+          {stopps.length > 0 ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Kunde</th>
+                  <th>Adresse</th>
+                  <th>Kommission</th>
+                  <th>Telefon</th>
+                  <th>Hinweis</th>
+                  <th>Status</th>
+                  <th>Foto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stopps.map((s) => (
+                  <tr key={s.id}>
+                    <td>{s.kunde}</td>
+                    <td>{s.adresse}</td>
+                    <td>{s.kommission}</td>
+                    <td>
+                      {s.telefon ? (
+                        <a href={`tel:${s.telefon}`}>{s.telefon}</a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td>{s.hinweis}</td>
+                    <td>{s.status}</td>
+                    <td>📷</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>Keine Tourdaten verfügbar</p>
+          )}
+
+          {showMap && <MapView stops={stopps} />}
+        </>
       )}
 
-      {showMap && <MapView stops={stopps} />}
+      {activeTab === "wochen" && <Wochenuebersicht />}
     </div>
   );
 }
