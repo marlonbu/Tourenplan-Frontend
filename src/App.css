@@ -194,6 +194,23 @@ a:hover {
 }
 
 /* ===================================
+   Foto-Upload Button
+=================================== */
+.photo-btn {
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #f9f9f9;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.photo-btn:hover {
+  background: #eef6fc;
+  transform: scale(1.05);
+}
+
+/* ===================================
    Wochenübersicht
 =================================== */
 .weekview {
