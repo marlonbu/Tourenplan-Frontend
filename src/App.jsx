@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import WeekView from "./components/WeekView";
 
@@ -11,19 +11,20 @@ function App() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
-  const [activeTab, setActiveTab] = useState("wochen"); // Wochenübersicht zuerst aktiv
+  const [activeTab, setActiveTab] = useState("wochen"); // Wochenübersicht links zuerst
   const [tourData, setTourData] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const isLoggedIn = !!token;
 
-  // 🔑 Token aus localStorage laden
+  // Referenzen für versteckte File-Inputs je Stopp
+  const fileInputsRef = useRef({}); // { [stoppId]: input }
+
   useEffect(() => {
     const t = localStorage.getItem("tourenplan_token");
     if (t) setToken(t);
   }, []);
 
-  // 🚚 Fahrer laden
   useEffect(() => {
     if (!isLoggedIn) return;
     fetch(`${API_URL}/fahrer`, {
@@ -37,7 +38,6 @@ function App() {
       .catch((err) => console.error(err));
   }, [isLoggedIn]);
 
-  // 📅 Tagestour laden
   const ladeTagestour = async () => {
     if (!selectedFahrer || !datum) return;
     setLoading(true);
@@ -55,7 +55,6 @@ function App() {
     }
   };
 
-  // 🔓 Login
   const handleLogin = async () => {
     try {
       const res = await fetch(`${API_URL}/login`, {
@@ -78,6 +77,34 @@ function App() {
     setFahrer([]);
     setSelectedFahrer("");
     setTourData([]);
+  };
+
+  // 📷 Upload-Trigger: öffnet den versteckten Datei-Input (Kamera)
+  const openCameraForStopp = (stoppId) => {
+    const input = fileInputsRef.current[stoppId];
+    if (input) input.click();
+  };
+
+  // 📷 Upload-Handler
+  const handlePhotoSelected = async (stoppId, file) => {
+    if (!file) return;
+    try {
+      const form = new FormData();
+      form.append("photo", file);
+      const res = await fetch(`${API_URL}/upload-photo/${stoppId}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!res.ok) throw new Error("Upload fehlgeschlagen");
+      await res.json();
+      alert("📷 Foto gespeichert");
+      // Optional: Tagestour neu laden (falls du später Foto-Status anzeigen willst)
+      // await ladeTagestour();
+    } catch (e) {
+      console.error(e);
+      alert("Foto-Upload fehlgeschlagen.");
+    }
   };
 
   return (
@@ -103,7 +130,7 @@ function App() {
         <>
           <h1>🚚 Tourenplan</h1>
 
-          {/* Tabs getauscht */}
+          {/* Tabs: Wochenübersicht links, Tagestour rechts */}
           <div className="tabs">
             <button
               className={activeTab === "wochen" ? "active" : ""}
@@ -155,22 +182,42 @@ function App() {
                       <th>Telefon</th>
                       <th>Hinweis</th>
                       <th>Status</th>
+                      <th>Foto</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {tourData.map((s, i) => (
-                      <tr key={i}>
+                    {tourData.map((s) => (
+                      <tr key={s.id}>
                         <td>{s.kunde}</td>
                         <td>{s.adresse}</td>
                         <td>
                           {s.telefon ? (
-                            <a href={`tel:${s.telefon}`}>{s.telefon}</a>
+                            <a href={`tel:${String(s.telefon).replace(/[^\d+]/g, "")}`}>{s.telefon}</a>
                           ) : (
                             "-"
                           )}
                         </td>
                         <td>{s.hinweis || "-"}</td>
                         <td>{s.status || "-"}</td>
+                        <td>
+                          {/* Versteckter Input pro Stopp (öffnet Kamera auf Mobilgeräten) */}
+                          <input
+                            ref={(el) => (fileInputsRef.current[s.id] = el)}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            style={{ display: "none" }}
+                            onChange={(e) => handlePhotoSelected(s.id, e.target.files?.[0])}
+                          />
+                          <button
+                            type="button"
+                            className="photo-btn"
+                            title="Foto aufnehmen"
+                            onClick={() => openCameraForStopp(s.id)}
+                          >
+                            📷
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
