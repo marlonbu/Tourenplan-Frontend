@@ -8,16 +8,15 @@ const MapView = ({ stops }) => {
   const mapRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
 
-  // Firmenadresse als Startpunkt
+  // Firmenadresse (Startpunkt)
   const startAddress = "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern";
 
-  // Geocoding Funktion (Adresse → Koordinaten)
+  // Hilfsfunktion: Adresse → Koordinaten
   const getCoords = async (address) => {
     try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-        address
-      )}`;
-      const res = await fetch(url);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`
+      );
       const data = await res.json();
       if (data && data.length > 0) {
         return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
@@ -35,12 +34,12 @@ const MapView = ({ stops }) => {
     if (!stops || stops.length === 0) return;
 
     const initMap = async () => {
-      // Existierende Karte entfernen (wenn bereits vorhanden)
+      // Alte Karte entfernen (falls neu geladen)
       if (mapRef.current) {
         mapRef.current.remove();
       }
 
-      // Karte initialisieren (Start auf Lindern)
+      // Karte initialisieren
       const map = L.map("map", {
         center: [52.8412721, 7.7702298],
         zoom: 9,
@@ -51,20 +50,18 @@ const MapView = ({ stops }) => {
         attribution: "© OpenStreetMap contributors",
       }).addTo(map);
 
-      // Warte auf alle Koordinaten (Start + Stopps)
       const waypoints = [];
 
-      // Startpunkt hinzufügen
+      // Startpunkt (Firma)
       const startCoords = await getCoords(startAddress);
       if (startCoords) {
         waypoints.push(L.latLng(startCoords[0], startCoords[1]));
         L.marker(startCoords)
           .addTo(map)
-          .bindPopup("Start: Hans Gehlenborg GmbH")
-          .openPopup();
+          .bindPopup("Start: Hans Gehlenborg GmbH");
       }
 
-      // Stopps nacheinander auflösen
+      // Stopps abarbeiten
       for (const stop of stops) {
         if (stop.adresse) {
           const coords = await getCoords(stop.adresse);
@@ -77,23 +74,32 @@ const MapView = ({ stops }) => {
         }
       }
 
-      // Wenn keine gültigen Wegpunkte → abbrechen
       if (waypoints.length < 2) {
         console.warn("Nicht genug Wegpunkte für Routing.");
         return;
       }
 
-      // Routing erst starten, wenn alles fertig ist
+      // Routing ohne Routenbeschreibung (Turn-by-Turn)
       setTimeout(() => {
-        L.Routing.control({
+        const control = L.Routing.control({
           waypoints,
           routeWhileDragging: false,
           lineOptions: {
             styles: [{ color: "#007bff", weight: 5 }],
           },
-          createMarker: () => null, // keine extra Marker vom Routing-Plugin
+          createMarker: () => null,
+          show: false, // keine Routenbeschreibung
+          addWaypoints: false,
+          draggableWaypoints: false,
+          fitSelectedRoutes: true,
         }).addTo(map);
-      }, 500); // kleine Verzögerung für stabileren Aufbau
+
+        // Panel (Beschreibung) entfernen, falls Leaflet es dennoch erzeugt
+        const panels = document.getElementsByClassName("leaflet-routing-container");
+        if (panels.length > 0) {
+          for (const p of panels) p.style.display = "none";
+        }
+      }, 500);
 
       setMapReady(true);
     };
