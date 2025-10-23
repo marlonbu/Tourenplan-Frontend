@@ -12,9 +12,11 @@ function App() {
   const [stopps, setStopps] = useState([]);
   const [showMap, setShowMap] = useState(true);
   const [message, setMessage] = useState("");
+  const [selectedWeek, setSelectedWeek] = useState(null);
+  const [weeks, setWeeks] = useState([]);
 
   // ---------------------------------------------------------
-  // Login-Funktion
+  // 🔑 Login
   // ---------------------------------------------------------
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -37,7 +39,48 @@ function App() {
   };
 
   // ---------------------------------------------------------
-  // Fahrer laden
+  // 📅 Wochen generieren
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const weeksArr = [];
+
+    const getMonday = (d) => {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(date.setDate(diff));
+    };
+
+    const firstMonday = getMonday(new Date(year, 0, 1));
+
+    for (let i = 0; i < 52; i++) {
+      const start = new Date(firstMonday);
+      start.setDate(start.getDate() + i * 7);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+
+      const weekNum = i + 1;
+      const format = (d) =>
+        `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+      weeksArr.push({
+        label: `KW ${weekNum} (${format(start)} - ${format(end)})`,
+        value: weekNum,
+      });
+    }
+
+    // aktuelle KW bestimmen
+    const currentWeek = Math.ceil(
+      ((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7
+    );
+
+    setWeeks(weeksArr);
+    setSelectedWeek(currentWeek);
+  }, []);
+
+  // ---------------------------------------------------------
+  // 🚚 Fahrer laden
   // ---------------------------------------------------------
   useEffect(() => {
     if (!token) return;
@@ -57,7 +100,7 @@ function App() {
   }, [token]);
 
   // ---------------------------------------------------------
-  // Tourdaten laden
+  // 🚗 Tourdaten laden
   // ---------------------------------------------------------
   const ladeTour = async () => {
     if (!selectedFahrer || !datum) return;
@@ -86,7 +129,7 @@ function App() {
   }, [selectedFahrer, datum]);
 
   // ---------------------------------------------------------
-  // Demo neu laden
+  // 🔄 Demo neu laden
   // ---------------------------------------------------------
   const demoNeuLaden = async () => {
     try {
@@ -105,18 +148,19 @@ function App() {
   };
 
   // ---------------------------------------------------------
-  // Karte in Google Maps öffnen
+  // 🗺️ Google Maps Route öffnen
   // ---------------------------------------------------------
   const openInGoogleMaps = () => {
-    const addresses = stopps.map((s) => s.adresse).join("/");
-    const url = `https://www.google.com/maps/dir/${encodeURIComponent(
-      "Fehnstraße 3, 49699 Lindern"
-    )}/${encodeURIComponent(addresses)}`;
+    const start = "Fehnstraße 3, 49699 Lindern";
+    const route = [start, ...stopps.map((s) => s.adresse)]
+      .map((a) => encodeURIComponent(a))
+      .join("/");
+    const url = `https://www.google.com/maps/dir/${route}`;
     window.open(url, "_blank");
   };
 
   // ---------------------------------------------------------
-  // Logout nach 60 Minuten Inaktivität
+  // ⏰ Auto-Logout nach 60 Minuten
   // ---------------------------------------------------------
   useEffect(() => {
     if (!token) return;
@@ -129,7 +173,7 @@ function App() {
   }, [token]);
 
   // ---------------------------------------------------------
-  // Render Login oder App
+  // 🔒 Login-Ansicht
   // ---------------------------------------------------------
   if (!token) {
     return (
@@ -145,17 +189,52 @@ function App() {
   }
 
   // ---------------------------------------------------------
-  // Wochenübersicht (Dummy – kommt später mit Daten)
+  // 📅 Wochenübersicht-Komponente
   // ---------------------------------------------------------
   const Wochenuebersicht = () => (
     <div className="wochenuebersicht">
       <h2>Wochenübersicht</h2>
-      <p>Hier erscheint später die Übersicht aller Touren der Woche.</p>
+      <div className="week-selector">
+        <label>Kalenderwoche:</label>
+        <div className="week-dropdown">
+          <select
+            size="6"
+            value={selectedWeek}
+            onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+          >
+            {weeks.map((w) => (
+              <option key={w.value} value={w.value}>
+                {w.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Fahrer</th>
+            <th>Kunde</th>
+            <th>Kommission</th>
+            <th>Hinweis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stopps.map((s) => (
+            <tr key={s.id}>
+              <td>{tour?.fahrer_name || "-"}</td>
+              <td>{s.kunde}</td>
+              <td>{s.kommission}</td>
+              <td>{s.hinweis}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 
   // ---------------------------------------------------------
-  // Haupt-Render
+  // 🧭 Hauptlayout
   // ---------------------------------------------------------
   return (
     <div className="app-container">
