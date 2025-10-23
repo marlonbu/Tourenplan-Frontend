@@ -3,15 +3,26 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-routing-machine";
 import "leaflet-routing-machine/dist/leaflet-routing-machine.css";
+import markerIconPng from "leaflet/dist/images/marker-icon.png";
+import markerShadowPng from "leaflet/dist/images/marker-shadow.png";
+
+// Standard-Marker-Icon fixen
+const defaultIcon = L.icon({
+  iconUrl: markerIconPng,
+  shadowUrl: markerShadowPng,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+});
+L.Marker.prototype.options.icon = defaultIcon;
 
 const MapView = ({ stops }) => {
   const mapRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
 
-  // Firmenadresse (Startpunkt)
+  // Fester Startpunkt (Hans Gehlenborg GmbH)
   const startAddress = "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern";
+  const startCoords = [52.8413511, 7.7705647];
 
-  // Hilfsfunktion: Adresse → Koordinaten
   const getCoords = async (address) => {
     try {
       const res = await fetch(
@@ -20,10 +31,8 @@ const MapView = ({ stops }) => {
       const data = await res.json();
       if (data && data.length > 0) {
         return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-      } else {
-        console.warn("Keine Koordinaten gefunden für:", address);
-        return null;
       }
+      return null;
     } catch (err) {
       console.error("Fehler beim Geocoding:", err);
       return null;
@@ -34,16 +43,11 @@ const MapView = ({ stops }) => {
     if (!stops || stops.length === 0) return;
 
     const initMap = async () => {
-      // Alte Karte entfernen (falls neu geladen)
       if (mapRef.current) {
         mapRef.current.remove();
       }
 
-      // Karte initialisieren
-      const map = L.map("map", {
-        center: [52.8412721, 7.7702298],
-        zoom: 9,
-      });
+      const map = L.map("map", { center: startCoords, zoom: 8 });
       mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -51,17 +55,9 @@ const MapView = ({ stops }) => {
       }).addTo(map);
 
       const waypoints = [];
+      L.marker(startCoords).addTo(map).bindPopup("Start: Hans Gehlenborg GmbH");
+      waypoints.push(L.latLng(startCoords[0], startCoords[1]));
 
-      // Startpunkt (Firma)
-      const startCoords = await getCoords(startAddress);
-      if (startCoords) {
-        waypoints.push(L.latLng(startCoords[0], startCoords[1]));
-        L.marker(startCoords)
-          .addTo(map)
-          .bindPopup("Start: Hans Gehlenborg GmbH");
-      }
-
-      // Stopps abarbeiten
       for (const stop of stops) {
         if (stop.adresse) {
           const coords = await getCoords(stop.adresse);
@@ -69,17 +65,13 @@ const MapView = ({ stops }) => {
             waypoints.push(L.latLng(coords[0], coords[1]));
             L.marker(coords)
               .addTo(map)
-              .bindPopup(`${stop.kunde || "Kunde"}<br/>${stop.adresse}`);
+              .bindPopup(`${stop.kunde}<br/>${stop.adresse}`);
           }
         }
       }
 
-      if (waypoints.length < 2) {
-        console.warn("Nicht genug Wegpunkte für Routing.");
-        return;
-      }
+      if (waypoints.length < 2) return;
 
-      // Routing ohne Routenbeschreibung (Turn-by-Turn)
       setTimeout(() => {
         const control = L.Routing.control({
           waypoints,
@@ -88,19 +80,17 @@ const MapView = ({ stops }) => {
             styles: [{ color: "#007bff", weight: 5 }],
           },
           createMarker: () => null,
-          show: false, // keine Routenbeschreibung
+          show: false,
           addWaypoints: false,
           draggableWaypoints: false,
           fitSelectedRoutes: true,
         }).addTo(map);
 
-        // Panel (Beschreibung) entfernen, falls Leaflet es dennoch erzeugt
         const panels = document.getElementsByClassName("leaflet-routing-container");
         if (panels.length > 0) {
           for (const p of panels) p.style.display = "none";
         }
-      }, 500);
-
+      }, 400);
       setMapReady(true);
     };
 
