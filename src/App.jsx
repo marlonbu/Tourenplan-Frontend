@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 import MapView from "./components/MapView";
 
@@ -15,6 +15,9 @@ function App() {
   const [selectedWeek, setSelectedWeek] = useState(null);
   const [weeks, setWeeks] = useState([]);
   const [wochenTouren, setWochenTouren] = useState([]);
+  const [showWeekDropdown, setShowWeekDropdown] = useState(false);
+
+  const dropdownRef = useRef(null);
 
   // ---------------------------------------------------------
   // 🔑 Login
@@ -197,6 +200,19 @@ function App() {
   }, [token]);
 
   // ---------------------------------------------------------
+  // 📦 Klick außerhalb des Dropdowns → schließen
+  // ---------------------------------------------------------
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowWeekDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // ---------------------------------------------------------
   // 🔒 Login-Ansicht
   // ---------------------------------------------------------
   if (!token) {
@@ -218,21 +234,35 @@ function App() {
   const Wochenuebersicht = () => (
     <div className="wochenuebersicht">
       <h2>Wochenübersicht</h2>
-      <div className="week-selector">
-        <label>Kalenderwoche:</label>
-        <div className="week-dropdown">
-          <select
-            size="6"
-            value={selectedWeek}
-            onChange={(e) => setSelectedWeek(parseInt(e.target.value))}
+
+      <div className="week-selector" ref={dropdownRef}>
+        <div className="week-button-container">
+          <button
+            className="week-button"
+            onClick={() => setShowWeekDropdown(!showWeekDropdown)}
           >
-            {weeks.map((w) => (
-              <option key={w.value} value={w.value}>
-                {w.label}
-              </option>
-            ))}
-          </select>
+            Kalenderwoche: KW {selectedWeek}
+          </button>
         </div>
+
+        {showWeekDropdown && (
+          <div className="week-dropdown-list">
+            {weeks.map((w) => (
+              <div
+                key={w.value}
+                className={`week-option ${
+                  w.value === selectedWeek ? "selected" : ""
+                }`}
+                onClick={() => {
+                  setSelectedWeek(w.value);
+                  setShowWeekDropdown(false);
+                }}
+              >
+                {w.label}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {wochenTouren.length > 0 ? (
