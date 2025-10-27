@@ -3,6 +3,7 @@ import { api } from "../api";
 import MapView from "../components/MapView";
 
 export default function Tagestour() {
+  const [me, setMe] = useState(null);
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(new Date().toISOString().split("T")[0]);
@@ -11,12 +12,27 @@ export default function Tagestour() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Hole User-Info (role, fahrer_id)
   useEffect(() => {
+    api.me().then(setMe).catch(() => setError("Fehler beim Laden des Benutzers"));
+  }, []);
+
+  // Lade Fahrerliste: Admin → alle, Fahrer → nur sich selbst (kommt schon gefiltert vom Backend)
+  useEffect(() => {
+    if (!me) return;
     api
       .listFahrer()
-      .then(setFahrer)
+      .then((list) => {
+        setFahrer(list);
+        // Fahrer: setze automatisch seine ID; Admin: nimm ersten Eintrag
+        if (me.role === "fahrer" && me.fahrer_id) {
+          setSelectedFahrer(String(me.fahrer_id));
+        } else if (list.length) {
+          setSelectedFahrer(String(list[0].id));
+        }
+      })
       .catch(() => setError("Fehler beim Laden der Fahrer"));
-  }, []);
+  }, [me]);
 
   async function ladeTour() {
     if (!selectedFahrer || !datum) return;
@@ -44,25 +60,40 @@ export default function Tagestour() {
 
   useEffect(() => {
     if (selectedFahrer) ladeTour();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFahrer, datum]);
+
+  if (!me) {
+    return <div className="text-gray-500">Lade Benutzer…</div>;
+  }
+
+  const isAdmin = me.role === "admin";
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-4 bg-white shadow rounded-lg p-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Fahrer</label>
-          <select
-            value={selectedFahrer}
-            onChange={(e) => setSelectedFahrer(e.target.value)}
-            className="border rounded-md px-3 py-2"
-          >
-            <option value="">– bitte wählen –</option>
-            {fahrer.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name}
-              </option>
-            ))}
-          </select>
+          {isAdmin ? (
+            <select
+              value={selectedFahrer}
+              onChange={(e) => setSelectedFahrer(e.target.value)}
+              className="border rounded-md px-3 py-2"
+            >
+              {fahrer.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              className="border rounded-md px-3 py-2 bg-gray-100"
+              value={fahrer[0]?.name || "Mein Fahrerprofil"}
+              disabled
+              readOnly
+            />
+          )}
         </div>
 
         <div>
@@ -131,6 +162,13 @@ export default function Tagestour() {
                     </td>
                   </tr>
                 ))}
+                {!stopps.length && (
+                  <tr>
+                    <td colSpan="6" className="text-center text-gray-400 italic py-3">
+                      Keine Stopps vorhanden
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
