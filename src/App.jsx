@@ -4,32 +4,26 @@ import MapView from "./components/MapView";
 import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
 
-// Helper
 function todayISO() {
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function classNames(...arr) {
-  return arr.filter(Boolean).join(" ");
-}
-
-// ---------------------------------------------
-// 🔹 Tagestour mit Karte + Foto-Upload
-// ---------------------------------------------
+// ------------------------------------------------------------
+// Tagestour mit Karte + Foto-Upload
+// ------------------------------------------------------------
 function Tagestour({ fahrer, selectedFahrerId }) {
   const [datum, setDatum] = useState(todayISO());
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Daten laden
   useEffect(() => {
     if (!selectedFahrerId) return;
     (async () => {
+      setLoading(true);
       try {
-        setLoading(true);
         const data = await api.getTourForDay(selectedFahrerId, datum);
         setTour(data.tour);
         const enriched = await Promise.all(
@@ -41,72 +35,74 @@ function Tagestour({ fahrer, selectedFahrerId }) {
         setStopps(enriched);
       } catch (e) {
         console.error(e);
-        setStopps([]);
       } finally {
         setLoading(false);
       }
     })();
   }, [selectedFahrerId, datum]);
 
-  // Upload
   async function handleUpload(e, stoppId) {
     const file = e.target.files[0];
     if (!file) return;
     const formData = new FormData();
     formData.append("foto", file);
     formData.append("stopp_id", stoppId);
-
     await fetch(`${import.meta.env.VITE_API_BASE}/upload-foto`, {
       method: "POST",
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       body: formData,
     });
-
-    // Reload stopps
     const refreshed = await api.getTourForDay(selectedFahrerId, datum);
     setStopps(refreshed.stopps);
   }
 
   return (
-    <div>
-      <div className="flex gap-2 items-end mb-3">
-        <input
-          type="date"
-          value={datum}
-          onChange={(e) => setDatum(e.target.value)}
-        />
+    <div className="space-y-6">
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-sm font-semibold text-gray-600 mb-1">Datum</label>
+          <input
+            type="date"
+            value={datum}
+            onChange={(e) => setDatum(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2"
+          />
+        </div>
       </div>
 
       {loading ? (
-        <div>Lade Tour…</div>
+        <div className="text-gray-500">Lade Tour…</div>
       ) : !tour ? (
-        <div>Keine Tour gefunden.</div>
+        <div className="text-gray-500">Keine Tour gefunden.</div>
       ) : (
         <>
           <MapView stopps={stopps} />
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
+          <div className="overflow-x-auto rounded-lg shadow">
+            <table className="min-w-full border-collapse bg-white">
+              <thead className="bg-primary text-white">
                 <tr>
-                  <th>#</th>
-                  <th>Kunde</th>
-                  <th>Adresse</th>
-                  <th>Foto</th>
+                  <th className="py-2 px-3 text-left">#</th>
+                  <th className="py-2 px-3 text-left">Kunde</th>
+                  <th className="py-2 px-3 text-left">Adresse</th>
+                  <th className="py-2 px-3 text-left">Foto</th>
                 </tr>
               </thead>
               <tbody>
                 {stopps.map((s, i) => (
-                  <tr key={s.id}>
-                    <td>{s.position ?? i + 1}</td>
-                    <td>{s.kunde}</td>
-                    <td>{s.adresse}</td>
-                    <td>
+                  <tr
+                    key={s.id}
+                    className={i % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                  >
+                    <td className="py-2 px-3">{s.position ?? i + 1}</td>
+                    <td className="py-2 px-3">{s.kunde}</td>
+                    <td className="py-2 px-3">{s.adresse}</td>
+                    <td className="py-2 px-3">
                       {s.foto_url ? (
                         <a
                           href={s.foto_url}
                           target="_blank"
                           rel="noreferrer"
-                          title="Foto ansehen"
+                          className="text-primary hover:underline"
                         >
                           📷
                         </a>
@@ -116,6 +112,7 @@ function Tagestour({ fahrer, selectedFahrerId }) {
                           accept="image/*"
                           capture="environment"
                           onChange={(e) => handleUpload(e, s.id)}
+                          className="text-sm"
                         />
                       )}
                     </td>
@@ -123,7 +120,12 @@ function Tagestour({ fahrer, selectedFahrerId }) {
                 ))}
                 {!stopps.length && (
                   <tr>
-                    <td colSpan="4">Keine Stopps vorhanden.</td>
+                    <td
+                      colSpan="4"
+                      className="py-3 text-center text-gray-400 italic"
+                    >
+                      Keine Stopps vorhanden
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -135,7 +137,6 @@ function Tagestour({ fahrer, selectedFahrerId }) {
   );
 }
 
-// Geocoding-Helfer (OpenStreetMap)
 async function geocode(address) {
   try {
     const q = encodeURIComponent(address);
@@ -143,19 +144,18 @@ async function geocode(address) {
       `https://nominatim.openstreetmap.org/search?format=json&q=${q}`
     );
     const data = await res.json();
-    if (data[0])
-      return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+    if (data[0]) return [parseFloat(data[0].lat), parseFloat(data[0].lon)];
   } catch {
-    /* ignore */
+    return null;
   }
   return null;
 }
 
-// ---------------------------------------------
-// 🔸 Haupt-App
-// ---------------------------------------------
+// ------------------------------------------------------------
+// Haupt-App
+// ------------------------------------------------------------
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [loginForm, setLoginForm] = useState({
     username: "Gehlenborg",
     password: "Orga1023/",
@@ -169,7 +169,7 @@ export default function App() {
     try {
       const res = await api.login(loginForm.username, loginForm.password);
       setToken(res.token);
-    } catch (e) {
+    } catch {
       alert("Login fehlgeschlagen");
     }
   }
@@ -179,7 +179,6 @@ export default function App() {
     setToken("");
   }
 
-  // Fahrer laden
   useEffect(() => {
     if (!token) return;
     (async () => {
@@ -200,42 +199,46 @@ export default function App() {
     return m;
   }, [fahrer]);
 
-  // Login-Ansicht
+  // ---- Login-View ----
   if (!token) {
     return (
-      <div className="container">
-        <h1>Tourenplan – Login</h1>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <form
           onSubmit={doLogin}
-          className="card"
-          style={{ maxWidth: 420 }}
+          className="bg-white p-8 rounded-xl shadow-md w-80 space-y-4"
         >
-          <div className="field">
-            <label>Benutzername</label>
+          <h1 className="text-2xl font-bold text-primary text-center">
+            Tourenplan Login
+          </h1>
+          <div>
+            <label className="block text-sm font-semibold mb-1">
+              Benutzername
+            </label>
             <input
+              className="border w-full px-3 py-2 rounded-md"
               value={loginForm.username}
               onChange={(e) =>
-                setLoginForm((p) => ({
-                  ...p,
-                  username: e.target.value,
-                }))
+                setLoginForm((p) => ({ ...p, username: e.target.value }))
               }
             />
           </div>
-          <div className="field">
-            <label>Passwort</label>
+          <div>
+            <label className="block text-sm font-semibold mb-1">
+              Passwort
+            </label>
             <input
               type="password"
+              className="border w-full px-3 py-2 rounded-md"
               value={loginForm.password}
               onChange={(e) =>
-                setLoginForm((p) => ({
-                  ...p,
-                  password: e.target.value,
-                }))
+                setLoginForm((p) => ({ ...p, password: e.target.value }))
               }
             />
           </div>
-          <button type="submit" className="btn-primary">
+          <button
+            type="submit"
+            className="bg-primary text-white w-full py-2 rounded-md hover:bg-blue-700 transition"
+          >
             Anmelden
           </button>
         </form>
@@ -243,18 +246,17 @@ export default function App() {
     );
   }
 
-  // App-Ansicht
+  // ---- Haupt-App ----
   return (
-    <div className="container">
-      <header className="app-header">
-        <h1>Tourenplan</h1>
-        <div className="header-actions">
-          <div className="select">
-            <label>Fahrer</label>
+    <div className="min-h-screen bg-gray-50 text-gray-800">
+      <header className="bg-white shadow mb-6">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-primary">Tourenplan</h1>
+          <div className="flex gap-4 items-center">
             <select
               value={selectedFahrerId}
               onChange={(e) => setSelectedFahrerId(e.target.value)}
-              style={{ minWidth: 160 }}
+              className="border border-gray-300 rounded-md px-3 py-2"
             >
               {fahrer.map((f) => (
                 <option key={f.id} value={String(f.id)}>
@@ -262,40 +264,39 @@ export default function App() {
                 </option>
               ))}
             </select>
+            <button
+              onClick={logout}
+              className="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded-md"
+            >
+              Logout
+            </button>
           </div>
-          <button className="btn" onClick={logout}>
-            Logout
-          </button>
         </div>
       </header>
 
-      <nav className="tabs">
-        <button
-          className={classNames("tab", tab === "tagestour" && "active")}
-          onClick={() => setTab("tagestour")}
-        >
-          Tagestour
-        </button>
-        <button
-          className={classNames("tab", tab === "planung" && "active")}
-          onClick={() => setTab("planung")}
-        >
-          Planung
-        </button>
-        <button
-          className={classNames("tab", tab === "uebersicht" && "active")}
-          onClick={() => setTab("uebersicht")}
-        >
-          Gesamtübersicht
-        </button>
+      <nav className="max-w-6xl mx-auto flex gap-2 mb-6">
+        {[
+          ["tagestour", "Tagestour"],
+          ["planung", "Planung"],
+          ["uebersicht", "Gesamtübersicht"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`px-4 py-2 rounded-md font-semibold transition ${
+              tab === key
+                ? "bg-primary text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </nav>
 
-      <main>
+      <main className="max-w-6xl mx-auto px-6 pb-10">
         {tab === "tagestour" && (
-          <Tagestour
-            fahrer={fahrer}
-            selectedFahrerId={selectedFahrerId}
-          />
+          <Tagestour fahrer={fahrer} selectedFahrerId={selectedFahrerId} />
         )}
         {tab === "planung" && (
           <Planung
