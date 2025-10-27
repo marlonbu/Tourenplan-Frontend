@@ -13,14 +13,14 @@ async function login(username, password) {
   });
   if (!res.ok) throw new Error("Login fehlgeschlagen");
   const data = await res.json();
-  localStorage.setItem("token", data.token);
-  return data; // { token, role, fahrer_id, username }
+  if (data.token) localStorage.setItem("token", data.token);
+  return data;
 }
 
 async function me() {
   const res = await fetch(`${API_BASE}/me`, { headers: { ...authHeader() } });
   if (!res.ok) throw new Error("Me fehlgeschlagen");
-  return res.json(); // { userId, username, role, fahrer_id }
+  return res.json();
 }
 
 async function listFahrer() {
@@ -30,41 +30,60 @@ async function listFahrer() {
 }
 
 async function getTourForDay(fahrerId, datum) {
-  const res = await fetch(`${API_BASE}/touren/${fahrerId}/${datum}`, { headers: { ...authHeader() } });
+  const res = await fetch(`${API_BASE}/touren/${fahrerId}/${datum}`, {
+    headers: { ...authHeader() },
+  });
   if (!res.ok) throw new Error("Tour konnte nicht geladen werden");
   return res.json();
 }
 
-async function getTourenWoche(query = {}) {
-  const params = new URLSearchParams(query).toString();
-  const res = await fetch(`${API_BASE}/touren-woche?${params}`, { headers: { ...authHeader() } });
-  if (!res.ok) throw new Error("Tourenübersicht konnte nicht geladen werden");
+async function createTour(fahrer_id, datum) {
+  const res = await fetch(`${API_BASE}/touren`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeader() },
+    body: JSON.stringify({ fahrer_id, datum }),
+  });
+  if (!res.ok) throw new Error("Tour konnte nicht angelegt werden");
   return res.json();
 }
 
-async function addStopp(stopp) {
+async function addStopp(tour_id, s) {
   const res = await fetch(`${API_BASE}/stopps`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeader() },
-    body: JSON.stringify(stopp),
+    body: JSON.stringify({ tour_id, ...s }),
   });
   if (!res.ok) throw new Error("Stopp konnte nicht angelegt werden");
   return res.json();
 }
 
 async function deleteStopp(stoppId) {
-  const res = await fetch(`${API_BASE}/stopps/${stoppId}`, { method: "DELETE", headers: { ...authHeader() } });
+  const res = await fetch(`${API_BASE}/stopps/${stoppId}`, {
+    method: "DELETE",
+    headers: { ...authHeader() },
+  });
   if (!res.ok) throw new Error("Stopp konnte nicht gelöscht werden");
   return res.json();
 }
 
 async function uploadFoto(stoppId, file) {
-  const formData = new FormData();
-  formData.append("foto", file);
-  formData.append("stopp_id", stoppId);
-
-  const res = await fetch(`${API_BASE}/upload-foto`, { method: "POST", headers: { ...authHeader() }, body: formData });
+  const fd = new FormData();
+  fd.append("foto", file);
+  const res = await fetch(`${API_BASE}/stopps/${stoppId}/foto`, {
+    method: "POST",
+    headers: { ...authHeader() },
+    body: fd,
+  });
   if (!res.ok) throw new Error("Foto-Upload fehlgeschlagen");
+  return res.json();
+}
+
+async function getTourenWoche(params) {
+  const q = new URLSearchParams(params).toString();
+  const res = await fetch(`${API_BASE}/touren-woche?${q}`, {
+    headers: { ...authHeader() },
+  });
+  if (!res.ok) throw new Error("Gesamtübersicht fehlgeschlagen");
   return res.json();
 }
 
@@ -73,8 +92,9 @@ export const api = {
   me,
   listFahrer,
   getTourForDay,
-  getTourenWoche,
+  createTour,
   addStopp,
   deleteStopp,
   uploadFoto,
+  getTourenWoche,
 };
