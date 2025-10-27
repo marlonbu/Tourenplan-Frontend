@@ -2,12 +2,14 @@ import React, { useState } from "react";
 import Tagestour from "./pages/Tagestour";
 import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
+import { Menu, X } from "lucide-react";
 
 export default function App() {
-  const [tab, setTab] = useState("Tagestour");
+  const [activeTab, setActiveTab] = useState("Tagestour");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const renderContent = () => {
-    switch (tab) {
+    switch (activeTab) {
       case "Tagestour":
         return <Tagestour />;
       case "Planung":
@@ -20,31 +22,62 @@ export default function App() {
   };
 
   return (
-    <div className="container">
-      {/* Header */}
-      <header className="navbar">
-        <h1>🚛 Gehlenborg Tourenplan</h1>
+    <div className="flex min-h-screen bg-gray-100">
+      {/* Sidebar */}
+      <aside
+        className={`fixed md:static top-0 left-0 h-full bg-[#0058A3] text-white w-64 transform ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } md:translate-x-0 transition-transform duration-200 z-50 shadow-lg`}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b border-blue-700">
+          <h1 className="text-lg font-semibold">🚛 Tourenplan</h1>
+          <button
+            className="md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X size={24} />
+          </button>
+        </div>
 
-        <nav className="nav-tabs">
+        <nav className="flex flex-col mt-4">
           {["Tagestour", "Planung", "Gesamtübersicht"].map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
-              className={`nav-tab ${tab === t ? "active" : ""}`}
+              onClick={() => {
+                setActiveTab(t);
+                setSidebarOpen(false);
+              }}
+              className={`text-left px-6 py-3 font-medium transition ${
+                activeTab === t
+                  ? "bg-blue-900"
+                  : "hover:bg-blue-800 text-blue-100"
+              }`}
             >
               {t}
             </button>
           ))}
         </nav>
-      </header>
 
-      {/* Inhalt */}
-      <main>{renderContent()}</main>
+        <div className="mt-auto px-6 py-4 text-sm text-blue-100 opacity-80">
+          © {new Date().getFullYear()} Hans Gehlenborg GmbH
+        </div>
+      </aside>
 
-      {/* Footer */}
-      <footer className="text-center text-sm text-gray-500 mt-12">
-        © {new Date().getFullYear()} Hans Gehlenborg GmbH – Tourenplan-System
-      </footer>
+      {/* Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Mobile Header */}
+        <header className="flex items-center justify-between bg-white px-4 py-3 shadow md:hidden">
+          <button onClick={() => setSidebarOpen(true)}>
+            <Menu size={26} className="text-[#0058A3]" />
+          </button>
+          <h2 className="text-lg font-semibold text-[#0058A3]">
+            {activeTab}
+          </h2>
+        </header>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6 md:p-10">{renderContent()}</main>
+      </div>
     </div>
   );
 }
