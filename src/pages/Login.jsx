@@ -14,48 +14,74 @@ export default function Login() {
         window.location.href = "/";
       }
     } catch {
-      setError("Login fehlgeschlagen");
+      setError("❌ Login fehlgeschlagen – bitte Zugangsdaten prüfen");
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-      <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-        <h1 className="text-2xl font-semibold text-[#0058A3] mb-6 text-center">
-          Gehlenborg Tourenplan
-        </h1>
-        <form onSubmit={handleLogin} className="space-y-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#f3f6fa]">
+      <div className="bg-white shadow-lg rounded-2xl w-full max-w-md p-8">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <img
+            src="/logo192.png"
+            alt="Gehlenborg"
+            className="mx-auto w-20 mb-4"
+          />
+          <h1 className="text-2xl font-semibold text-[#0058A3]">
+            Möbel Gehlenborg
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Tourenplan – Anmeldung
+          </p>
+        </div>
+
+        {/* Formular */}
+        <form onSubmit={handleLogin} className="space-y-5">
           <div>
-            <label className="block text-sm font-medium mb-1">Benutzername</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Benutzername
+            </label>
             <input
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="border rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-[#0058A3]"
               required
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-[#0058A3] outline-none"
+              placeholder="z. B. Gehlenborg"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Passwort</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Passwort
+            </label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="border rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-[#0058A3]"
               required
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-[#0058A3] outline-none"
+              placeholder="z. B. Orga1023/"
             />
           </div>
 
-          {error && <p className="text-red-600 text-sm">{error}</p>}
+          {error && (
+            <p className="text-red-600 text-sm text-center mt-2">{error}</p>
+          )}
 
           <button
             type="submit"
-            className="btn-primary w-full"
+            className="w-full bg-[#0058A3] text-white font-semibold py-2 rounded-md hover:bg-blue-800 transition"
           >
-            Login
+            Anmelden
           </button>
         </form>
+
+        {/* Footer */}
+        <p className="text-xs text-center text-gray-400 mt-8">
+          © {new Date().getFullYear()} Möbel Gehlenborg GmbH
+        </p>
       </div>
     </div>
   );
