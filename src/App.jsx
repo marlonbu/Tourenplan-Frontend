@@ -1,406 +1,235 @@
-import { useState, useEffect, useRef } from "react";
-import "./App.css";
-import MapView from "./components/MapView";
+// src/App.jsx
+import React, { useEffect, useMemo, useState } from 'react';
+import { api } from './api';
+import Planung from './pages/Planung';
+import Gesamtuebersicht from './pages/Gesamtuebersicht';
 
-function App() {
-  const [activeTab, setActiveTab] = useState("tagestour");
-  const [token, setToken] = useState(localStorage.getItem("token") || "");
-  const [fahrer, setFahrer] = useState([]);
-  const [selectedFahrer, setSelectedFahrer] = useState("");
-  const [datum, setDatum] = useState(new Date().toISOString().split("T")[0]);
+// Hilfsfunktionen
+function todayISO() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function classNames(...arr) {
+  return arr.filter(Boolean).join(' ');
+}
+
+// Einfache Tagestour-Ansicht (kompakt, nutzt /touren/:fahrerId/:datum)
+function Tagestour({ fahrer, selectedFahrerId }) {
+  const [datum, setDatum] = useState(todayISO());
+  const [loading, setLoading] = useState(false);
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
-  const [showMap, setShowMap] = useState(true);
-  const [message, setMessage] = useState("");
-  const [selectedWeek, setSelectedWeek] = useState(null);
-  const [weeks, setWeeks] = useState([]);
-  const [wochenTouren, setWochenTouren] = useState([]);
-  const [showWeekDropdown, setShowWeekDropdown] = useState(false);
-  const dropdownRef = useRef(null);
-  const listRef = useRef(null);
 
-  // ---------------------------------------------------------
-  // 🔑 Login
-  // ---------------------------------------------------------
-  const handleLogin = async (e) => {
+  useEffect(() => {
+    if (!selectedFahrerId || !datum) return;
+    (async () => {
+      try {
+        setLoading(true);
+        const data = await api.getTourForDay(selectedFahrerId, datum);
+        setTour(data.tour);
+        setStopps(data.stopps || []);
+      } catch (e) {
+        console.error(e);
+        setTour(null);
+        setStopps([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [selectedFahrerId, datum]);
+
+  return (
+    <div>
+      <div className="flex gap-2 items-end mb-3">
+        <div>
+          <label>Datum</label>
+          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        </div>
+      </div>
+
+      {loading ? (
+        <div>lädt…</div>
+      ) : !tour ? (
+        <div>Keine Tour gefunden.</div>
+      ) : (
+        <>
+          <div className="mb-2"><b>Tour #{tour.id}</b> • Fahrer #{tour.fahrer_id} • {tour.datum}</div>
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Kunde</th>
+                  <th>Adresse</th>
+                  <th>Kommission</th>
+                  <th>Telefon</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stopps.map((s, i) => (
+                  <tr key={s.id}>
+                    <td>{s.position ?? i + 1}</td>
+                    <td>{s.kunde}</td>
+                    <td>{s.adresse}</td>
+                    <td>{s.kommission || '-'}</td>
+                    <td>{s.telefon || '-'}</td>
+                    <td>{s.status || '-'}</td>
+                  </tr>
+                ))}
+                {!stopps.length && (
+                  <tr>
+                    <td colSpan="6">Keine Stopps vorhanden.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [loginForm, setLoginForm] = useState({ username: 'Gehlenborg', password: 'Orga1023/' });
+  const [tab, setTab] = useState('tagestour'); // tagestour | planung | uebersicht
+  const [fahrer, setFahrer] = useState([]);
+  const [selectedFahrerId, setSelectedFahrerId] = useState('');
+
+  // Login
+  async function doLogin(e) {
     e.preventDefault();
-    const username = e.target.username.value;
-    const password = e.target.password.value;
-
-    const res = await fetch("https://tourenplan.onrender.com/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const data = await res.json();
-    if (data.token) {
-      localStorage.setItem("token", data.token);
-      setToken(data.token);
-    } else {
-      alert("Login fehlgeschlagen");
+    try {
+      const res = await api.login(loginForm.username, loginForm.password);
+      setToken(res.token);
+    } catch (e) {
+      alert('Login fehlgeschlagen');
+      console.error(e);
     }
-  };
+  }
 
-  // ---------------------------------------------------------
-  // 📅 Wochen generieren (Mo–So)
-  // ---------------------------------------------------------
-  useEffect(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const weeksArr = [];
+  function logout() {
+    localStorage.removeItem('token');
+    setToken('');
+  }
 
-    const getMonday = (d) => {
-      const date = new Date(d);
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
-      return new Date(date.setDate(diff));
-    };
-
-    const firstMonday = getMonday(new Date(year, 0, 1));
-
-    for (let i = 0; i < 52; i++) {
-      const start = new Date(firstMonday);
-      start.setDate(start.getDate() + i * 7);
-      const end = new Date(start);
-      end.setDate(start.getDate() + 6);
-
-      const weekNum = i + 1;
-      const format = (d) =>
-        `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
-      weeksArr.push({
-        label: `KW ${weekNum} (${format(start)} - ${format(end)})`,
-        value: weekNum,
-      });
-    }
-
-    // Aktuelle KW bestimmen
-    const currentWeek = Math.ceil(
-      ((now - new Date(now.getFullYear(), 0, 1)) / 86400000 + new Date(now.getFullYear(), 0, 1).getDay() + 1) / 7
-    );
-
-    setWeeks(weeksArr);
-    setSelectedWeek(currentWeek);
-  }, []);
-
-  // ---------------------------------------------------------
-  // 🚚 Fahrer laden
-  // ---------------------------------------------------------
+  // Fahrerliste laden
   useEffect(() => {
     if (!token) return;
-    fetch("https://tourenplan.onrender.com/fahrer", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => {
-        if (res.status === 401) {
-          localStorage.removeItem("token");
-          setToken("");
-          return [];
+    (async () => {
+      try {
+        const list = await api.listFahrer();
+        setFahrer(list);
+        if (list.length && !selectedFahrerId) {
+          setSelectedFahrerId(String(list[0].id));
         }
-        return res.json();
-      })
-      .then((data) => Array.isArray(data) && setFahrer(data))
-      .catch((err) => console.error("Fehler beim Laden der Fahrer:", err));
+      } catch (e) {
+        console.error(e);
+      }
+    })();
   }, [token]);
 
-  // ---------------------------------------------------------
-  // 🚗 Tourdaten laden
-  // ---------------------------------------------------------
-  const ladeTour = async () => {
-    if (!selectedFahrer || !datum) return;
-    try {
-      const res = await fetch(
-        `https://tourenplan.onrender.com/touren/${selectedFahrer}/${datum}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        setToken("");
-        return;
-      }
-      const data = await res.json();
-      setTour(data.tour);
-      setStopps(data.stopps || []);
-    } catch (err) {
-      console.error("Fehler beim Laden der Tour:", err);
-    }
-  };
+  const fahrerMap = useMemo(() => {
+    const m = new Map();
+    fahrer.forEach((f) => m.set(String(f.id), f.name));
+    return m;
+  }, [fahrer]);
 
-  useEffect(() => {
-    if (selectedFahrer && datum) ladeTour();
-  }, [selectedFahrer, datum]);
-
-  // ---------------------------------------------------------
-  // 🔄 Demo neu laden
-  // ---------------------------------------------------------
-  const demoNeuLaden = async () => {
-    try {
-      await fetch("https://tourenplan.onrender.com/reset", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetch("https://tourenplan.onrender.com/seed-demo", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setMessage("✅ Demo erfolgreich aktualisiert");
-      setTimeout(() => setMessage(""), 3000);
-      ladeTour();
-    } catch (err) {
-      console.error("Fehler beim Neuladen der Demo:", err);
-    }
-  };
-
-  // ---------------------------------------------------------
-  // 🗺️ Google Maps Route öffnen
-  // ---------------------------------------------------------
-  const openInGoogleMaps = () => {
-    const start = "Fehnstraße 3, 49699 Lindern";
-    const route = [start, ...stopps.map((s) => s.adresse)]
-      .map((a) => encodeURIComponent(a))
-      .join("/");
-    const url = `https://www.google.com/maps/dir/${route}`;
-    window.open(url, "_blank");
-  };
-
-  // ---------------------------------------------------------
-  // 🗓️ Wochenübersicht-Daten laden
-  // ---------------------------------------------------------
-  const ladeWochenTouren = async (kw) => {
-    try {
-      const res = await fetch(
-        `https://tourenplan.onrender.com/touren-woche/${kw}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        setToken("");
-        return;
-      }
-      const data = await res.json();
-      setWochenTouren(data.touren || []);
-    } catch (err) {
-      console.error("Fehler beim Laden der Wochenübersicht:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (selectedWeek) ladeWochenTouren(selectedWeek);
-  }, [selectedWeek]);
-
-  // ---------------------------------------------------------
-  // ⏰ Auto-Logout
-  // ---------------------------------------------------------
-  useEffect(() => {
-    if (!token) return;
-    const timer = setTimeout(() => {
-      localStorage.removeItem("token");
-      setToken("");
-      alert("Sitzung abgelaufen – bitte neu einloggen.");
-    }, 60 * 60 * 1000);
-    return () => clearTimeout(timer);
-  }, [token]);
-
-  // ---------------------------------------------------------
-  // 📦 Klick außerhalb des Dropdowns → schließen
-  // ---------------------------------------------------------
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowWeekDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  // ---------------------------------------------------------
-  // 📜 Automatisch zur aktuellen KW scrollen
-  // ---------------------------------------------------------
-  useEffect(() => {
-    if (showWeekDropdown && listRef.current) {
-      const selectedIndex = weeks.findIndex((w) => w.value === selectedWeek);
-      if (selectedIndex >= 0) {
-        const itemHeight = 40; // ungefährer Zeilenwert
-        listRef.current.scrollTop = selectedIndex * itemHeight - 80;
-      }
-    }
-  }, [showWeekDropdown, weeks, selectedWeek]);
-
-  // ---------------------------------------------------------
-  // 🔒 Login-Ansicht
-  // ---------------------------------------------------------
   if (!token) {
     return (
-      <div className="login-container">
-        <h2>Tourenplan Login</h2>
-        <form onSubmit={handleLogin}>
-          <input type="text" name="username" placeholder="Benutzername" required />
-          <input type="password" name="password" placeholder="Passwort" required />
-          <button type="submit">Login</button>
+      <div className="container">
+        <h1>Tourenplan – Login</h1>
+        <form onSubmit={doLogin} className="card" style={{ maxWidth: 420 }}>
+          <div className="field">
+            <label>Benutzername</label>
+            <input
+              value={loginForm.username}
+              onChange={(e) => setLoginForm((p) => ({ ...p, username: e.target.value }))}
+              placeholder="Gehlenborg"
+            />
+          </div>
+          <div className="field">
+            <label>Passwort</label>
+            <input
+              type="password"
+              value={loginForm.password}
+              onChange={(e) => setLoginForm((p) => ({ ...p, password: e.target.value }))}
+              placeholder="Orga1023/"
+            />
+          </div>
+          <button type="submit" className="btn-primary" style={{ marginTop: 8 }}>
+            Anmelden
+          </button>
         </form>
       </div>
     );
   }
 
-  // ---------------------------------------------------------
-  // 📅 Wochenübersicht-Komponente
-  // ---------------------------------------------------------
-  const Wochenuebersicht = () => (
-    <div className="wochenuebersicht">
-      <h2>Wochenübersicht</h2>
-
-      <div className="week-selector" ref={dropdownRef}>
-        <div className="week-button-container">
-          <button
-            className="week-button"
-            onClick={() => setShowWeekDropdown(!showWeekDropdown)}
-          >
-            Kalenderwoche: KW {selectedWeek}
-          </button>
-        </div>
-
-        <div
-          ref={listRef}
-          className={`week-dropdown-list ${showWeekDropdown ? "visible" : "hidden"}`}
-        >
-          {weeks.map((w) => (
-            <div
-              key={w.value}
-              className={`week-option ${
-                w.value === selectedWeek ? "selected" : ""
-              }`}
-              onClick={() => {
-                setSelectedWeek(w.value);
-                setShowWeekDropdown(false);
-              }}
-            >
-              {w.label}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {wochenTouren.length > 0 ? (
-        <table>
-          <thead>
-            <tr>
-              <th>Datum</th>
-              <th>Fahrer</th>
-              <th>Kunde</th>
-              <th>Kommission</th>
-              <th>Hinweis</th>
-            </tr>
-          </thead>
-          <tbody>
-            {wochenTouren.map((t, idx) => (
-              <tr key={idx}>
-                <td>{new Date(t.datum).toLocaleDateString()}</td>
-                <td>{t.fahrer}</td>
-                <td>{t.kunde}</td>
-                <td>{t.kommission}</td>
-                <td>{t.hinweis}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <p>Keine Tourdaten für diese Woche gefunden.</p>
-      )}
-    </div>
-  );
-
-  // ---------------------------------------------------------
-  // 🧭 Hauptlayout
-  // ---------------------------------------------------------
   return (
-    <div className="app-container">
-      <h1>🚚 Tourenplan</h1>
-
-      <div className="tabs">
-        <button
-          className={activeTab === "tagestour" ? "active" : ""}
-          onClick={() => setActiveTab("tagestour")}
-        >
-          Tagestour
-        </button>
-        <button
-          className={activeTab === "wochen" ? "active" : ""}
-          onClick={() => setActiveTab("wochen")}
-        >
-          Wochenübersicht
-        </button>
-      </div>
-
-      {activeTab === "tagestour" && (
-        <>
-          <div className="controls">
+    <div className="container">
+      <header className="app-header">
+        <h1>Tourenplan</h1>
+        <div className="header-actions">
+          <div className="select">
+            <label>Fahrer</label>
             <select
-              value={selectedFahrer}
-              onChange={(e) => setSelectedFahrer(e.target.value)}
+              value={selectedFahrerId}
+              onChange={(e) => setSelectedFahrerId(e.target.value)}
+              style={{ minWidth: 160 }}
             >
-              <option value="">Fahrer wählen...</option>
               {fahrer.map((f) => (
-                <option key={f.id} value={f.id}>
+                <option key={f.id} value={String(f.id)}>
                   {f.name}
                 </option>
               ))}
             </select>
-
-            <input
-              type="date"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-            />
-
-            <button onClick={ladeTour}>Tour laden</button>
-            <button onClick={demoNeuLaden}>🔄 Demo neu laden</button>
-
-            {message && <p className="success-message">{message}</p>}
-
-            <button onClick={openInGoogleMaps}>🧭 Tour in Google Maps öffnen</button>
-
-            <button onClick={() => setShowMap(!showMap)}>
-              {showMap ? "🗺️ Karte ausblenden" : "🗺️ Karte anzeigen"}
-            </button>
           </div>
+          <button className="btn" onClick={logout}>Logout</button>
+        </div>
+      </header>
 
-          {stopps.length > 0 ? (
-            <table>
-              <thead>
-                <tr>
-                  <th>Kunde</th>
-                  <th>Adresse</th>
-                  <th>Kommission</th>
-                  <th>Telefon</th>
-                  <th>Hinweis</th>
-                  <th>Status</th>
-                  <th>Foto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stopps.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.kunde}</td>
-                    <td>{s.adresse}</td>
-                    <td>{s.kommission}</td>
-                    <td>{s.telefon ? <a href={`tel:${s.telefon}`}>{s.telefon}</a> : "-"}</td>
-                    <td>{s.hinweis}</td>
-                    <td>{s.status}</td>
-                    <td>📷</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <p>Keine Tourdaten verfügbar</p>
-          )}
+      <nav className="tabs">
+        <button
+          className={classNames('tab', tab === 'tagestour' && 'active')}
+          onClick={() => setTab('tagestour')}
+        >
+          Tagestour
+        </button>
+        <button
+          className={classNames('tab', tab === 'planung' && 'active')}
+          onClick={() => setTab('planung')}
+        >
+          Planung
+        </button>
+        <button
+          className={classNames('tab', tab === 'uebersicht' && 'active')}
+          onClick={() => setTab('uebersicht')}
+        >
+          Gesamtübersicht
+        </button>
+      </nav>
 
-          {showMap && <MapView stops={stopps} />}
-        </>
-      )}
+      <main>
+        {tab === 'tagestour' && (
+          <Tagestour fahrer={fahrer} selectedFahrerId={selectedFahrerId} />
+        )}
 
-      {activeTab === "wochen" && <Wochenuebersicht />}
+        {tab === 'planung' && (
+          <Planung
+            fahrer={fahrer}
+            selectedFahrerId={selectedFahrerId}
+            setSelectedFahrerId={setSelectedFahrerId}
+          />
+        )}
+
+        {tab === 'uebersicht' && (
+          <Gesamtuebersicht fahrer={fahrer} />
+        )}
+      </main>
     </div>
   );
 }
-
-export default App;
