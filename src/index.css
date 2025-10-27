@@ -1,15 +1,102 @@
-@import "@tailwindcss/postcss";
+/* ===========================================================
+   Tailwind CSS – Haupt-Stylesheet
+   Möbel Gehlenborg Tourenplan Frontend
+   Stabil für Tailwind v3.x + Vite
+   =========================================================== */
 
-@theme {
-  --color-primary: #0058A3;
-  --color-grayText: #666666;
-  --font-sans: "Inter", ui-sans-serif, system-ui;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ====== Global Styles ====== */
+
+html, body {
+  @apply bg-white text-grayText font-sans;
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-@layer base {
-  body {
-    font-family: var(--font-sans);
-    color: var(--color-grayText);
-    background-color: white;
-  }
+/* ====== Scrollbar Styling ====== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #0058A3;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: #00447c;
+}
+
+/* ====== Tabellen ====== */
+table {
+  @apply w-full border-collapse text-sm;
+}
+
+th {
+  @apply bg-primary text-white font-semibold text-left px-3 py-2;
+}
+
+td {
+  @apply px-3 py-2 border-t border-gray-200;
+}
+
+tr:nth-child(even) {
+  @apply bg-gray-50;
+}
+
+/* ====== Buttons ====== */
+.btn-primary {
+  @apply bg-primary text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-700 transition;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-semibold hover:bg-gray-300 transition;
+}
+
+/* ====== Input-Felder ====== */
+input, select, textarea {
+  @apply border border-gray-300 rounded-md px-3 py-2 text-sm;
+}
+
+input:focus, select:focus, textarea:focus {
+  @apply outline-none ring-2 ring-primary ring-offset-1;
+}
+
+/* ====== Kartencontainer (Leaflet) ====== */
+.leaflet-container {
+  @apply rounded-lg shadow border border-gray-200;
+}
+
+/* ====== Header / Tabs ====== */
+.app-header {
+  @apply bg-white shadow flex justify-between items-center px-6 py-4;
+}
+
+.tabs {
+  @apply flex gap-2 mb-6;
+}
+
+.tab {
+  @apply px-4 py-2 rounded-md font-semibold transition;
+}
+
+.tab.active {
+  @apply bg-primary text-white;
+}
+
+.tab:not(.active) {
+  @apply bg-white text-gray-700 hover:bg-gray-100;
+}
+
+/* ====== Datei-Upload (Foto-Button) ====== */
+input[type="file"] {
+  @apply text-sm text-gray-600;
+}
+
+/* ====== Tabellencontainer (mobile scroll) ====== */
+.table-container {
+  @apply overflow-x-auto rounded-lg shadow border border-gray-100;
 }
