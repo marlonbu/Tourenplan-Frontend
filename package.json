@@ -11,6 +11,9 @@
   "dependencies": {
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
+    "react-leaflet": "^4.2.1",
+"leaflet": "^1.9.4",
+"@react-leaflet/core": "^2.1.0",
   },
   "devDependencies": {
     "vite": "^4.0.0",
