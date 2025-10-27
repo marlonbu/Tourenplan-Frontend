@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Tagestour from "./pages/Tagestour";
 import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
@@ -43,7 +43,7 @@ function Dashboard() {
       <aside className="w-64 bg-[#0058A3] text-white flex flex-col justify-between shadow-lg">
         <div>
           <div className="px-6 py-5 border-b border-blue-700">
-            <h1 className="text-xl font-semibold tracking-wide">
+            <h1 className="text-xl font-semibold text-white tracking-wide">
               🚛 Tourenplan
             </h1>
           </div>
