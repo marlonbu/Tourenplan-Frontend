@@ -14,7 +14,13 @@ async function login(username, password) {
   if (!res.ok) throw new Error("Login fehlgeschlagen");
   const data = await res.json();
   localStorage.setItem("token", data.token);
-  return data;
+  return data; // { token, role, fahrer_id, username }
+}
+
+async function me() {
+  const res = await fetch(`${API_BASE}/me`, { headers: { ...authHeader() } });
+  if (!res.ok) throw new Error("Me fehlgeschlagen");
+  return res.json(); // { userId, username, role, fahrer_id }
 }
 
 async function listFahrer() {
@@ -62,4 +68,13 @@ async function uploadFoto(stoppId, file) {
   return res.json();
 }
 
-export const api = { login, listFahrer, getTourForDay, getTourenWoche, addStopp, deleteStopp, uploadFoto };
+export const api = {
+  login,
+  me,
+  listFahrer,
+  getTourForDay,
+  getTourenWoche,
+  addStopp,
+  deleteStopp,
+  uploadFoto,
+};
