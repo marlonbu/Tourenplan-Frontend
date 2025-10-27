@@ -1,23 +1,16 @@
-/* ===========================================================
-   Tailwind CSS – Haupt-Stylesheet
-   Möbel Gehlenborg Tourenplan Frontend
-   Stabil für Tailwind v3.x + Vite
-   =========================================================== */
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ====== Global Styles ====== */
-
+/* ===== Grundlayout ===== */
 html, body {
-  @apply bg-white text-grayText font-sans;
+  @apply bg-gray-50 text-gray-800 font-sans;
   height: 100%;
   margin: 0;
   padding: 0;
 }
 
-/* ====== Scrollbar Styling ====== */
+/* ===== Scrollbar ===== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -30,73 +23,53 @@ html, body {
   background-color: #00447c;
 }
 
-/* ====== Tabellen ====== */
-table {
-  @apply w-full border-collapse text-sm;
-}
-
-th {
-  @apply bg-primary text-white font-semibold text-left px-3 py-2;
-}
-
-td {
-  @apply px-3 py-2 border-t border-gray-200;
-}
-
-tr:nth-child(even) {
-  @apply bg-gray-50;
-}
-
-/* ====== Buttons ====== */
+/* ===== Buttons ===== */
 .btn-primary {
-  @apply bg-primary text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-700 transition;
+  @apply bg-[#0058A3] text-white px-4 py-2 rounded-md font-semibold hover:bg-blue-700 transition;
 }
-
 .btn-secondary {
   @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-md font-semibold hover:bg-gray-300 transition;
 }
 
-/* ====== Input-Felder ====== */
-input, select, textarea {
-  @apply border border-gray-300 rounded-md px-3 py-2 text-sm;
+/* ===== Tabellen ===== */
+table {
+  @apply w-full border-collapse text-sm;
+}
+th {
+  @apply bg-[#0058A3] text-white font-semibold text-left px-3 py-2;
+}
+td {
+  @apply px-3 py-2 border-t border-gray-200;
+}
+tr:nth-child(even) {
+  @apply bg-gray-50;
 }
 
-input:focus, select:focus, textarea:focus {
-  @apply outline-none ring-2 ring-primary ring-offset-1;
-}
-
-/* ====== Kartencontainer (Leaflet) ====== */
+/* ===== Kartencontainer ===== */
 .leaflet-container {
   @apply rounded-lg shadow border border-gray-200;
 }
 
-/* ====== Header / Tabs ====== */
-.app-header {
-  @apply bg-white shadow flex justify-between items-center px-6 py-4;
-}
-
-.tabs {
-  @apply flex gap-2 mb-6;
-}
-
+/* ===== Tabs ===== */
 .tab {
-  @apply px-4 py-2 rounded-md font-semibold transition;
+  @apply px-5 py-2 rounded-md font-semibold transition;
 }
-
 .tab.active {
-  @apply bg-primary text-white;
+  @apply bg-[#0058A3] text-white shadow-sm;
 }
-
 .tab:not(.active) {
-  @apply bg-white text-gray-700 hover:bg-gray-100;
+  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
 }
 
-/* ====== Datei-Upload (Foto-Button) ====== */
-input[type="file"] {
-  @apply text-sm text-gray-600;
-}
-
-/* ====== Tabellencontainer (mobile scroll) ====== */
+/* ===== Container ===== */
 .table-container {
-  @apply overflow-x-auto rounded-lg shadow border border-gray-100;
+  @apply overflow-x-auto rounded-lg shadow border border-gray-100 bg-white;
+}
+
+/* ===== Formulare ===== */
+input, select, textarea {
+  @apply border border-gray-300 rounded-md px-3 py-2 text-sm bg-white;
+}
+input:focus, select:focus, textarea:focus {
+  @apply outline-none ring-2 ring-[#0058A3] ring-offset-1;
 }
