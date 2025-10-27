@@ -12,19 +12,16 @@ export default function Tagestour() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Hole User-Info (role, fahrer_id)
   useEffect(() => {
     api.me().then(setMe).catch(() => setError("Fehler beim Laden des Benutzers"));
   }, []);
 
-  // Lade Fahrerliste: Admin → alle, Fahrer → nur sich selbst (kommt schon gefiltert vom Backend)
   useEffect(() => {
     if (!me) return;
     api
       .listFahrer()
       .then((list) => {
         setFahrer(list);
-        // Fahrer: setze automatisch seine ID; Admin: nimm ersten Eintrag
         if (me.role === "fahrer" && me.fahrer_id) {
           setSelectedFahrer(String(me.fahrer_id));
         } else if (list.length) {
@@ -42,7 +39,7 @@ export default function Tagestour() {
       setTourInfo(data.tour);
       setStopps(data.stopps);
       setError("");
-    } catch (err) {
+    } catch {
       setError("Fehler beim Laden der Tour");
     } finally {
       setLoading(false);
@@ -60,7 +57,6 @@ export default function Tagestour() {
 
   useEffect(() => {
     if (selectedFahrer) ladeTour();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedFahrer, datum]);
 
   if (!me) {
@@ -70,7 +66,8 @@ export default function Tagestour() {
   const isAdmin = me.role === "admin";
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+      {/* Filterleiste */}
       <div className="flex flex-wrap items-end gap-4 bg-white shadow rounded-lg p-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Fahrer</label>
@@ -119,8 +116,9 @@ export default function Tagestour() {
       {loading && <p>Lade Tour…</p>}
 
       {tourInfo && (
-        <>
-          <div className="bg-white shadow rounded-lg p-4 table-container">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Tabelle */}
+          <div className="bg-white shadow rounded-lg p-4 table-container overflow-auto">
             <table>
               <thead>
                 <tr>
@@ -164,7 +162,10 @@ export default function Tagestour() {
                 ))}
                 {!stopps.length && (
                   <tr>
-                    <td colSpan="6" className="text-center text-gray-400 italic py-3">
+                    <td
+                      colSpan="6"
+                      className="text-center text-gray-400 italic py-3"
+                    >
                       Keine Stopps vorhanden
                     </td>
                   </tr>
@@ -173,10 +174,11 @@ export default function Tagestour() {
             </table>
           </div>
 
-          <div className="mt-6">
+          {/* Karte */}
+          <div className="bg-white shadow rounded-lg p-4 h-[500px]">
             <MapView stopps={stopps} />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
