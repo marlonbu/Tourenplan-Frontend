@@ -1,93 +1,128 @@
-// src/api.js
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001';
+// ==========================================================
+// API-Modul – Tourenplan Frontend
+// ==========================================================
 
-function authHeaders() {
-  const token = localStorage.getItem('token');
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:3001";
+
+// Token aus localStorage holen
+function authHeader() {
+  const token = localStorage.getItem("token");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function req(path, opts = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(opts.headers || {}),
-      ...authHeaders(),
-    },
+// ==========================================================
+//  LOGIN
+// ==========================================================
+async function login(username, password) {
+  const res = await fetch(`${API_BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
   });
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status} ${res.statusText} – ${text}`);
-  }
-  // /reset antwortet {ok:true}, DELETE evtl. ohne body
-  const contentType = res.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) return res.json();
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
+  if (!res.ok) throw new Error("Login fehlgeschlagen");
+  const data = await res.json();
+  localStorage.setItem("token", data.token);
+  return data;
 }
 
+// ==========================================================
+//  FAHRER
+// ==========================================================
+async function listFahrer() {
+  const res = await fetch(`${API_BASE}/fahrer`, {
+    headers: {
+      ...authHeader(),
+    },
+  });
+  if (!res.ok) throw new Error("Fahrerabruf fehlgeschlagen");
+  return res.json();
+}
+
+// ==========================================================
+//  TOUREN – Tagesdaten
+// ==========================================================
+async function getTourForDay(fahrerId, datum) {
+  const res = await fetch(`${API_BASE}/touren/${fahrerId}/${datum}`, {
+    headers: {
+      ...authHeader(),
+    },
+  });
+  if (!res.ok) throw new Error("Tour konnte nicht geladen werden");
+  return res.json();
+}
+
+// ==========================================================
+//  TOUREN – Wochen- oder Gesamtübersicht
+// ==========================================================
+async function getTourenWoche(query = {}) {
+  const params = new URLSearchParams(query).toString();
+  const res = await fetch(`${API_BASE}/touren-woche?${params}`, {
+    headers: {
+      ...authHeader(),
+    },
+  });
+  if (!res.ok) throw new Error("Tourenübersicht konnte nicht geladen werden");
+  return res.json();
+}
+
+// ==========================================================
+//  STOPPS – Anlegen
+// ==========================================================
+async function addStopp(stopp) {
+  const res = await fetch(`${API_BASE}/stopps`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeader(),
+    },
+    body: JSON.stringify(stopp),
+  });
+  if (!res.ok) throw new Error("Stopp konnte nicht angelegt werden");
+  return res.json();
+}
+
+// ==========================================================
+//  STOPPS – Löschen
+// ==========================================================
+async function deleteStopp(stoppId) {
+  const res = await fetch(`${API_BASE}/stopps/${stoppId}`, {
+    method: "DELETE",
+    headers: {
+      ...authHeader(),
+    },
+  });
+  if (!res.ok) throw new Error("Stopp konnte nicht gelöscht werden");
+  return res.json();
+}
+
+// ==========================================================
+//  FOTO-UPLOAD
+// ==========================================================
+async function uploadFoto(stoppId, file) {
+  const formData = new FormData();
+  formData.append("foto", file);
+  formData.append("stopp_id", stoppId);
+
+  const res = await fetch(`${API_BASE}/upload-foto`, {
+    method: "POST",
+    headers: {
+      ...authHeader(),
+    },
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Foto-Upload fehlgeschlagen");
+  return res.json();
+}
+
+// ==========================================================
+//  EXPORT
+// ==========================================================
 export const api = {
-  // Auth
-  async login(username, password) {
-    const data = await req('/login', {
-      method: 'POST',
-      body: JSON.stringify({ username, password }),
-    });
-    if (data?.token) localStorage.setItem('token', data.token);
-    return data;
-  },
-
-  // Stammdaten
-  listFahrer() {
-    return req('/fahrer', { method: 'GET' });
-  },
-
-  // Tagestour lesen
-  getTourForDay(fahrerId, datum) {
-    return req(`/touren/${encodeURIComponent(fahrerId)}/${encodeURIComponent(datum)}`, { method: 'GET' });
-  },
-
-  // Touren (CRUD + Filter)
-  createTour(payload) {
-    return req('/touren', { method: 'POST', body: JSON.stringify(payload) });
-  },
-  updateTour(id, payload) {
-    return req(`/touren/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-  },
-  deleteTour(id) {
-    return req(`/touren/${id}`, { method: 'DELETE' });
-  },
-  listTouren(params = {}) {
-    const q = new URLSearchParams(params).toString();
-    return req(`/touren${q ? `?${q}` : ''}`, { method: 'GET' });
-  },
-
-  // Stopps (CRUD)
-  listStopps(params = {}) {
-    const q = new URLSearchParams(params).toString();
-    return req(`/stopps${q ? `?${q}` : ''}`, { method: 'GET' });
-  },
-  createStopp(payload) {
-    return req('/stopps', { method: 'POST', body: JSON.stringify(payload) });
-  },
-  updateStopp(id, payload) {
-    return req(`/stopps/${id}`, { method: 'PUT', body: JSON.stringify(payload) });
-  },
-  deleteStopp(id) {
-    return req(`/stopps/${id}`, { method: 'DELETE' });
-  },
-
-  // Gesamtübersicht
-  uebersicht(params = {}) {
-    const q = new URLSearchParams(params).toString();
-    return req(`/uebersicht${q ? `?${q}` : ''}`, { method: 'GET' });
-  },
-
-  // Utilities
-  reset() {
-    return req('/reset', { method: 'POST' });
-  },
+  login,
+  listFahrer,
+  getTourForDay,
+  getTourenWoche,
+  addStopp,
+  deleteStopp,
+  uploadFoto,
 };
