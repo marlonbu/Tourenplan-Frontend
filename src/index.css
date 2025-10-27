@@ -92,3 +92,21 @@ input, select {
 .nav-tab:not(.active) {
   @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
 }
+/* ===========================================
+   Sidebar Dashboard Layout (Ergänzung)
+=========================================== */
+
+@media (max-width: 768px) {
+  .sidebar {
+    @apply fixed top-0 left-0 h-full z-50 bg-[#0058A3] text-white w-64 transform transition-transform;
+  }
+}
+
+.sidebar-button {
+  @apply text-left w-full px-6 py-3 font-medium hover:bg-blue-800 transition;
+}
+
+.sidebar-button.active {
+  @apply bg-blue-900;
+}
+
