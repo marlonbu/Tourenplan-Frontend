@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
+import { Menu, X, LogOut } from "lucide-react";
 import Tagestour from "./pages/Tagestour";
 import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
-import { Menu, X, LogOut } from "lucide-react";
+import Login from "./pages/Login";
 import { api } from "./api";
 
-export default function App() {
+function Dashboard() {
   const [activeTab, setActiveTab] = useState("Tagestour");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api
@@ -16,13 +19,13 @@ export default function App() {
       .then(setUser)
       .catch(() => {
         localStorage.removeItem("token");
-        window.location.href = "/";
+        navigate("/login");
       });
-  }, []);
+  }, [navigate]);
 
   function logout() {
     localStorage.removeItem("token");
-    window.location.href = "/";
+    navigate("/login");
   }
 
   const renderContent = () => {
@@ -40,7 +43,6 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar */}
       <aside
         className={`fixed md:static top-0 left-0 h-full bg-[#0058A3] text-white w-64 transform ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
@@ -48,10 +50,7 @@ export default function App() {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-blue-700">
           <h1 className="text-lg font-semibold">🚛 Tourenplan</h1>
-          <button
-            className="md:hidden"
-            onClick={() => setSidebarOpen(false)}
-          >
+          <button className="md:hidden" onClick={() => setSidebarOpen(false)}>
             <X size={24} />
           </button>
         </div>
@@ -75,7 +74,6 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Profilbereich unten */}
         {user && (
           <div className="mt-auto border-t border-blue-700 p-4 text-sm text-blue-100">
             <p className="font-medium">{user.username}</p>
@@ -92,19 +90,29 @@ export default function App() {
         )}
       </aside>
 
-      {/* Main Area */}
       <div className="flex-1 flex flex-col">
-        {/* Mobile Header */}
         <header className="flex items-center justify-between bg-white px-4 py-3 shadow md:hidden">
           <button onClick={() => setSidebarOpen(true)}>
             <Menu size={26} className="text-[#0058A3]" />
           </button>
-          <h2 className="text-lg font-semibold text-[#0058A3]">{activeTab}</h2>
+          <h2 className="text-lg font-semibold text-[#0058A3]">
+            {activeTab}
+          </h2>
         </header>
 
-        {/* Inhalt */}
         <main className="flex-1 p-4 md:p-8">{renderContent()}</main>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/*" element={<Dashboard />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
