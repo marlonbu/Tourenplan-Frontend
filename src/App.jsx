@@ -9,18 +9,14 @@ import { api } from "./api";
 
 function Dashboard() {
   const [activeTab, setActiveTab] = useState("Tagestour");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api
-      .me()
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem("token");
-        navigate("/login");
-      });
+    api.me().then(setUser).catch(() => {
+      localStorage.removeItem("token");
+      navigate("/login");
+    });
   }, [navigate]);
 
   function logout() {
@@ -42,42 +38,38 @@ function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <aside
-        className={`fixed md:static top-0 left-0 h-full bg-[#0058A3] text-white w-64 transform ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0 transition-transform duration-200 z-50 shadow-lg flex flex-col`}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-blue-700">
-          <h1 className="text-lg font-semibold">🚛 Tourenplan</h1>
-          <button className="md:hidden" onClick={() => setSidebarOpen(false)}>
-            <X size={24} />
-          </button>
+    <div className="flex h-screen bg-gray-100 overflow-hidden">
+      {/* Sidebar */}
+      <aside className="w-64 bg-[#0058A3] text-white flex flex-col justify-between shadow-lg">
+        <div>
+          <div className="px-6 py-5 border-b border-blue-700">
+            <h1 className="text-xl font-semibold tracking-wide">
+              🚛 Tourenplan
+            </h1>
+          </div>
+
+          <nav className="mt-6 flex flex-col">
+            {["Tagestour", "Planung", "Gesamtübersicht"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`text-left px-6 py-3 text-sm font-medium transition ${
+                  activeTab === tab
+                    ? "bg-blue-900"
+                    : "hover:bg-blue-800 text-blue-100"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
+          </nav>
         </div>
 
-        <nav className="flex flex-col mt-4">
-          {["Tagestour", "Planung", "Gesamtübersicht"].map((t) => (
-            <button
-              key={t}
-              onClick={() => {
-                setActiveTab(t);
-                setSidebarOpen(false);
-              }}
-              className={`text-left px-6 py-3 font-medium transition ${
-                activeTab === t
-                  ? "bg-blue-900"
-                  : "hover:bg-blue-800 text-blue-100"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </nav>
-
+        {/* Profilbereich unten */}
         {user && (
-          <div className="mt-auto border-t border-blue-700 p-4 text-sm text-blue-100">
-            <p className="font-medium">{user.username}</p>
-            <p className="text-xs opacity-80 mb-2">
+          <div className="border-t border-blue-700 p-5 text-sm">
+            <p className="font-semibold">{user.username || "Gehlenborg"}</p>
+            <p className="text-xs text-blue-200 mb-3">
               Rolle: {user.role === "admin" ? "Admin" : "Fahrer"}
             </p>
             <button
@@ -90,18 +82,8 @@ function Dashboard() {
         )}
       </aside>
 
-      <div className="flex-1 flex flex-col">
-        <header className="flex items-center justify-between bg-white px-4 py-3 shadow md:hidden">
-          <button onClick={() => setSidebarOpen(true)}>
-            <Menu size={26} className="text-[#0058A3]" />
-          </button>
-          <h2 className="text-lg font-semibold text-[#0058A3]">
-            {activeTab}
-          </h2>
-        </header>
-
-        <main className="flex-1 p-4 md:p-8">{renderContent()}</main>
-      </div>
+      {/* Content */}
+      <main className="flex-1 p-6 overflow-y-auto">{renderContent()}</main>
     </div>
   );
 }
