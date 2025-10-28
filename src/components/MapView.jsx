@@ -10,8 +10,8 @@ export default function MapView({ stopps = [] }) {
   const startpunkt = {
     name: "Hans Gehlenborg GmbH",
     adresse: "Fehnstraße 3, 49699 Lindern",
-    lat: 52.8637,
-    lng: 7.7747,
+    lat: 52.8569, // exakte Geokoordinaten
+    lng: 7.7677,
   };
 
   // Adressen -> Koordinaten (Geocoding mit Fallback)
