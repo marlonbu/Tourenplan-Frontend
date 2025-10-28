@@ -179,7 +179,7 @@ export default function Planung() {
           <input
             className="border rounded-md px-3 py-2 w-full md:w-1/2"
             placeholder="Neuer Fahrername"
-            value={neuerFaher || neuerFahrer} // fallback falls Tippfehler in älterer Datei
+            value={neuerFahrer} // fallback falls Tippfehler in älterer Datei
             onChange={(e) => setNeuerFahrer(e.target.value)}
           />
           <button
