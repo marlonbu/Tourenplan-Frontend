@@ -1,104 +1,75 @@
-import React, { useState, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
-import { LogOut } from "lucide-react";
-import Planung from "./pages/Planung";
+import React, { useState } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import Tagestour from "./pages/Tagestour";
+import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
 import Login from "./pages/Login";
-import { api } from "./api";
 
-function MainLayout() {
-  const [activeTab, setActiveTab] = useState("Planung");
-  const [user, setUser] = useState(null);
+export default function App() {
   const navigate = useNavigate();
+  const [token, setToken] = useState(localStorage.getItem("token") || "");
 
-  useEffect(() => {
-    api
-      .me()
-      .then(setUser)
-      .catch(() => {
-        localStorage.removeItem("token");
-        navigate("/login");
-      });
-  }, [navigate]);
-
-  function logout() {
+  const handleLogout = () => {
     localStorage.removeItem("token");
-    navigate("/login");
-  }
-
-  const renderContent = () => {
-    switch (activeTab) {
-      case "Planung":
-        return <Planung />;
-      case "Tagestour":
-        return <Tagestour />;
-      case "Gesamtübersicht":
-        return <Gesamtuebersicht />;
-      default:
-        return <Planung />;
-    }
+    setToken("");
+    navigate("/");
   };
 
-  return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-64 bg-[#0058A3] text-white flex flex-col justify-between shadow-lg">
-        <div>
-          <div className="px-6 py-5 border-b border-blue-700">
-            <h1 className="text-xl font-semibold text-white tracking-wide">
-              🚛 Tourenplan
-            </h1>
-          </div>
+  if (!token) {
+    return <Login onLoginSuccess={(t) => { setToken(t); navigate("/planung"); }} />;
+  }
 
-          {/* Navigation */}
-          <nav className="mt-6 flex flex-col">
-            {["Planung", "Tagestour", "Gesamtübersicht"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`text-left px-6 py-3 text-sm font-medium transition ${
-                  activeTab === tab
-                    ? "bg-blue-900"
-                    : "hover:bg-blue-800 text-blue-100"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+  return (
+    <div className="flex min-h-screen bg-gray-100 text-gray-900">
+      {/* Sidebar */}
+      <aside className="w-60 bg-[#0058A3] text-white flex flex-col justify-between">
+        <div>
+          <div className="text-center py-6 text-lg font-bold border-b border-blue-800">
+            🚛 <span className="text-white">Tourenplan</span>
+          </div>
+          <nav className="flex flex-col mt-4">
+            <button
+              onClick={() => navigate("/planung")}
+              className="px-4 py-3 text-left hover:bg-blue-700 transition"
+            >
+              Planung
+            </button>
+            <button
+              onClick={() => navigate("/tagestour")}
+              className="px-4 py-3 text-left hover:bg-blue-700 transition"
+            >
+              Tagestour
+            </button>
+            <button
+              onClick={() => navigate("/gesamtuebersicht")}
+              className="px-4 py-3 text-left hover:bg-blue-700 transition"
+            >
+              Gesamtübersicht
+            </button>
           </nav>
         </div>
 
-        {/* Profilbereich unten */}
-        {user && (
-          <div className="border-t border-blue-700 p-5 text-sm">
-            <p className="font-semibold">{user.username || "Gehlenborg"}</p>
-            <p className="text-xs text-blue-200 mb-3">
-              Rolle: {user.role === "admin" ? "Admin" : "Fahrer"}
-            </p>
-            <button
-              onClick={logout}
-              className="flex items-center gap-2 text-red-300 hover:text-red-100 transition"
-            >
-              <LogOut size={16} /> Logout
-            </button>
-          </div>
-        )}
+        <div className="px-4 py-4 border-t border-blue-800 text-sm">
+          <div className="mb-1 font-semibold">Gehlenborg</div>
+          <div className="text-xs text-blue-200 mb-2">Rolle: Admin</div>
+          <button
+            onClick={handleLogout}
+            className="text-left text-white hover:underline text-sm flex items-center gap-1"
+          >
+            <span>🚪</span> Logout
+          </button>
+        </div>
       </aside>
 
-      {/* Content */}
-      <main className="flex-1 p-6 overflow-y-auto">{renderContent()}</main>
+      {/* Hauptinhalt */}
+      <main className="flex-1 p-8 overflow-y-auto">
+        <Routes>
+          <Route path="/planung" element={<Planung />} />
+          <Route path="/tagestour" element={<Tagestour />} />
+          <Route path="/gesamtuebersicht" element={<Gesamtuebersicht />} />
+          <Route path="*" element={<Planung />} />
+        </Routes>
+      </main>
     </div>
-  );
-}
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/*" element={<MainLayout />} />
-      </Routes>
-    </BrowserRouter>
   );
 }
