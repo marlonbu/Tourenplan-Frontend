@@ -1,7 +1,7 @@
 const API_URL = import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
 export const api = {
-  // 🔐 Login
+  // Login
   login: async (username, password) => {
     const res = await fetch(`${API_URL}/login`, {
       method: "POST",
@@ -12,7 +12,7 @@ export const api = {
     return res.json();
   },
 
-  // 👥 Fahrer abrufen
+  // Fahrer
   listFahrer: async () => {
     const res = await fetch(`${API_URL}/fahrer`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -20,51 +20,6 @@ export const api = {
     if (!res.ok) throw new Error("Fehler beim Laden der Fahrer");
     return res.json();
   },
-
-  // 🚚 Tour eines Fahrers laden
-  getTour: async (fahrerId, datum) => {
-    const res = await fetch(`${API_URL}/touren/${fahrerId}/${datum}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
-    if (!res.ok) throw new Error("Fehler beim Laden der Tour");
-    return res.json();
-  },
-
-  // 🧭 Wochenübersicht laden
-  getWoche: async () => {
-    const res = await fetch(`${API_URL}/touren-woche`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
-    if (!res.ok) throw new Error("Fehler beim Laden der Wochenübersicht");
-    return res.json();
-  },
-
-  // 🗑️ Datenbank zurücksetzen
-  reset: async () => {
-    const res = await fetch(`${API_URL}/reset`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-    });
-    if (!res.ok) throw new Error("Fehler beim Zurücksetzen");
-    return res.json();
-  },
-
-  // 📸 Foto-Upload
-  uploadFoto: async (stoppId, file) => {
-    const formData = new FormData();
-    formData.append("foto", file);
-
-    const res = await fetch(`${API_URL}/upload/${stoppId}`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      body: formData,
-    });
-
-    if (!res.ok) throw new Error("Fehler beim Upload");
-    return res.json();
-  },
-
-  // ➕ Fahrer hinzufügen
   addFahrer: async (name) => {
     const res = await fetch(`${API_URL}/fahrer`, {
       method: "POST",
@@ -77,16 +32,91 @@ export const api = {
     if (!res.ok) throw new Error("Fehler beim Hinzufügen");
     return res.json();
   },
-
-  // 🗑️ Fahrer löschen
   deleteFahrer: async (id) => {
     const res = await fetch(`${API_URL}/fahrer/${id}`, {
       method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
     });
     if (!res.ok) throw new Error("Fehler beim Löschen");
+    return res.json();
+  },
+
+  // Tour
+  getTour: async (fahrerId, datum) => {
+    const res = await fetch(`${API_URL}/touren/${fahrerId}/${datum}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Laden der Tour");
+    return res.json();
+  },
+  createTour: async (fahrerId, datum) => {
+    const res = await fetch(`${API_URL}/touren`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify({ fahrerId, datum }),
+    });
+    if (!res.ok) throw new Error("Fehler beim Anlegen der Tour");
+    return res.json();
+  },
+  listStoppsByTour: async (tourId) => {
+    const res = await fetch(`${API_URL}/touren/${tourId}/stopps`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Laden der Stopps");
+    return res.json();
+  },
+
+  // Stopps
+  addStopp: async (tourId, payload) => {
+    const res = await fetch(`${API_URL}/touren/${tourId}/stopps`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Fehler beim Hinzufügen des Stopps");
+    return res.json();
+  },
+  updateStopp: async (id, payload) => {
+    const res = await fetch(`${API_URL}/stopps/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Fehler beim Aktualisieren des Stopps");
+    return res.json();
+  },
+  deleteStopp: async (id) => {
+    const res = await fetch(`${API_URL}/stopps/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Löschen des Stopps");
+    return res.json();
+  },
+
+  // Wochenübersicht / Reset (wie gehabt)
+  getWoche: async () => {
+    const res = await fetch(`${API_URL}/touren-woche`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Laden der Wochenübersicht");
+    return res.json();
+  },
+  reset: async () => {
+    const res = await fetch(`${API_URL}/reset`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Zurücksetzen");
     return res.json();
   },
 };
