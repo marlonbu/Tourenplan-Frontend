@@ -41,7 +41,7 @@ export const api = {
     return res.json();
   },
 
-  // Tour
+  // Planung / Tour
   getTour: async (fahrerId, datum) => {
     const res = await fetch(`${API_URL}/touren/${fahrerId}/${datum}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -68,8 +68,6 @@ export const api = {
     if (!res.ok) throw new Error("Fehler beim Laden der Stopps");
     return res.json();
   },
-
-  // Stopps
   addStopp: async (tourId, payload) => {
     const res = await fetch(`${API_URL}/touren/${tourId}/stopps`, {
       method: "POST",
@@ -103,7 +101,21 @@ export const api = {
     return res.json();
   },
 
-  // Wochenübersicht / Reset (wie gehabt)
+  // Gesamtübersicht
+  getGesamtTours: async ({ fahrerId, from, to, kunde } = {}) => {
+    const params = new URLSearchParams();
+    if (fahrerId) params.set("fahrerId", fahrerId);
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    if (kunde) params.set("kunde", kunde);
+    const res = await fetch(`${API_URL}/touren-gesamt?` + params.toString(), {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    });
+    if (!res.ok) throw new Error("Fehler beim Laden der Gesamtübersicht");
+    return res.json();
+  },
+
+  // (alt) Wochenübersicht / Reset
   getWoche: async () => {
     const res = await fetch(`${API_URL}/touren-woche`, {
       headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
