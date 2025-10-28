@@ -1,19 +1,12 @@
-export default defineConfig({
-  plugins: [react()],
-  define: {
-    'process.env.NODE_ENV': '"development"',
-  },
-});
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// ✅ Standardkonfiguration für Vite + React + Render
 export default defineConfig({
   plugins: [react()],
+  server: {
+    port: 5173,
+  },
   build: {
     outDir: "dist",
-  },
-  server: {
-    historyApiFallback: true, // sorgt für SPA-Routing im Dev-Modus
   },
 });
