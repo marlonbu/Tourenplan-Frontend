@@ -1,9 +1,9 @@
-import React, { Suspense } from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import Planung from "./pages/Planung";
+import Tagestour from "./pages/Tagestour";
 
-// Lazy-Laden verhindert, dass defekte Komponenten alles blockieren
-const Planung = React.lazy(() => import("./pages/Planung"));
-const Tagestour = React.lazy(() => import("./pages/Tagestour"));
+const API_URL = import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -17,10 +17,11 @@ const Layout = ({ children }) => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
+      {/* Sidebar */}
       <aside className="w-72 bg-[#0058A3] text-white flex flex-col">
         <div className="p-5 border-b border-white/20 flex items-center gap-2">
           <span className="text-2xl">🚚</span>
-          <div className="font-semibold text-xl">Tourenplan</div>
+          <div className="font-semibold text-xl text-white">Tourenplan</div>
         </div>
 
         <nav className="flex-1 p-3 space-y-2">
@@ -40,6 +41,7 @@ const Layout = ({ children }) => {
         </div>
       </aside>
 
+      {/* Content */}
       <main className="flex-1 p-6">
         <div className="max-w-6xl mx-auto">{children}</div>
       </main>
@@ -47,43 +49,48 @@ const Layout = ({ children }) => {
   );
 };
 
-// Minimal-Login
-function LoginForm() {
-  const [token, setToken] = React.useState("");
-  const [msg, setMsg] = React.useState("");
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (!token.trim()) return setMsg("❌ Kein Token eingegeben");
-    localStorage.setItem("token", token.trim());
-    window.location.reload();
-  };
-
-  return (
-    <form onSubmit={handleLogin} className="space-y-3">
-      <input
-        className="border rounded-md px-3 py-2 w-full"
-        placeholder="API-Token eingeben"
-        value={token}
-        onChange={(e) => setToken(e.target.value)}
-      />
-      <button className="bg-[#0058A3] text-white px-4 py-2 rounded-md w-full">
-        Anmelden
-      </button>
-      {msg && <div className="text-sm text-red-600">{msg}</div>}
-    </form>
-  );
-}
-
 export default function App() {
-  const token = localStorage.getItem("token");
+  const [loading, setLoading] = React.useState(true);
+  const [token, setToken] = React.useState(localStorage.getItem("token"));
+
+  // 🔄 Automatisches Login, falls nur "Gehlenborg" im Storage steht
+  useEffect(() => {
+    const autoLogin = async () => {
+      if (!token || token === "Gehlenborg") {
+        try {
+          const res = await fetch(`${API_URL}/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username: "Gehlenborg", password: "Orga1023/" }),
+          });
+          const data = await res.json();
+          if (data.token) {
+            localStorage.setItem("token", data.token);
+            setToken(data.token);
+          }
+        } catch (err) {
+          console.error("Auto-Login fehlgeschlagen:", err);
+        }
+      }
+      setLoading(false);
+    };
+    autoLogin();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-[#0058A3] font-semibold text-lg">🔄 Lade Anwendung...</div>
+      </div>
+    );
+  }
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white p-6 rounded-lg shadow w-full max-w-sm">
-          <h1 className="text-xl font-semibold text-[#0058A3] mb-4">Login</h1>
-          <LoginForm />
+      <div className="min-h-screen grid place-items-center bg-gray-50">
+        <div className="bg-white p-6 rounded-lg shadow w-full max-w-sm text-center">
+          <h1 className="text-xl font-semibold text-[#0058A3] mb-4">Login erforderlich</h1>
+          <p className="text-gray-600 mb-2">Bitte lade die Seite neu.</p>
         </div>
       </div>
     );
@@ -92,14 +99,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <Layout>
-        <Suspense fallback={<div className="p-6 text-center">⏳ Lädt Seite…</div>}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/planung" replace />} />
-            <Route path="/planung" element={<Planung />} />
-            <Route path="/tagestour" element={<Tagestour />} />
-            <Route path="*" element={<div className="p-6">404 – Nicht gefunden</div>} />
-          </Routes>
-        </Suspense>
+        <Routes>
+          <Route path="/" element={<Navigate to="/planung" replace />} />
+          <Route path="/planung" element={<Planung />} />
+          <Route path="/tagestour" element={<Tagestour />} />
+          <Route path="*" element={<div>Not Found</div>} />
+        </Routes>
       </Layout>
     </BrowserRouter>
   );
