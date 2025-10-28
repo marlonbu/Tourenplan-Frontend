@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
 
 export default function Planung() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
-  const [datum, setDatum] = useState(new Date().toISOString().split("T")[0]);
+  const [datum, setDatum] = useState("");
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
   const [neuerStopp, setNeuerStopp] = useState({
@@ -15,56 +15,71 @@ export default function Planung() {
     telefon: "",
     position: "",
   });
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [meldung, setMeldung] = useState("");
 
   // Fahrer laden
   useEffect(() => {
     api
       .listFahrer()
-      .then((data) => {
-        setFahrer(data);
-        if (data.length) setSelectedFahrer(String(data[0].id));
-      })
-      .catch(() => setMessage("Fehler beim Laden der Fahrer"));
+      .then(setFahrer)
+      .catch(() => setMeldung("Fehler beim Laden der Fahrer"));
   }, []);
 
-  // Tour laden
-  async function ladeTour() {
+  // Tour laden, wenn Fahrer & Datum gewählt
+  useEffect(() => {
     if (!selectedFahrer || !datum) return;
-    try {
-      const data = await api.getTourForDay(selectedFahrer, datum);
-      setTour(data.tour);
-      setStopps(data.stopps);
-      setMessage("");
-    } catch {
-      setTour(null);
-      setStopps([]);
-      setMessage("Noch keine Tour vorhanden");
+    async function loadTour() {
+      setLoading(true);
+      try {
+        const t = await api.getTourByFahrerUndDatum(selectedFahrer, datum);
+        setTour(t.tour);
+        setStopps(t.stopps || []);
+      } catch {
+        setTour(null);
+        setStopps([]);
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+    loadTour();
+  }, [selectedFahrer, datum]);
 
-  // Tour anlegen
-  async function createTour() {
-    if (!selectedFahrer || !datum) return;
+  // Neue Tour anlegen
+  async function anlegen() {
+    if (!selectedFahrer || !datum) {
+      setMeldung("Bitte Fahrer und Datum wählen.");
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await api.createTour(selectedFahrer, datum);
-      setTour(res.tour);
-      setMessage("✅ Tour wurde erfolgreich angelegt");
+      const t = await api.createTour({ fahrer_id: selectedFahrer, datum });
+      setTour(t.tour);
+      setMeldung("Neue Tour angelegt.");
     } catch {
-      setMessage("❌ Fehler beim Anlegen der Tour");
+      setMeldung("Fehler beim Anlegen der Tour.");
+    } finally {
+      setLoading(false);
     }
   }
 
   // Stopp hinzufügen
-  async function addStopp(e) {
-    e.preventDefault();
+  async function stoppHinzufuegen() {
     if (!tour) {
-      setMessage("⚠️ Bitte zuerst eine Tour anlegen");
+      setMeldung("Bitte zuerst eine Tour anlegen.");
       return;
     }
+    if (!neuerStopp.kunde || !neuerStopp.adresse) {
+      setMeldung("Bitte mindestens Kunde und Adresse angeben.");
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await api.addStopp(tour.id, neuerStopp);
-      setStopps([...stopps, res]);
+      const s = await api.createStopp({
+        tour_id: tour.id,
+        ...neuerStopp,
+      });
+      setStopps((prev) => [...prev, s]);
       setNeuerStopp({
         kunde: "",
         adresse: "",
@@ -73,34 +88,39 @@ export default function Planung() {
         telefon: "",
         position: "",
       });
-      setMessage("✅ Stopp hinzugefügt");
+      setMeldung("Stopp hinzugefügt.");
     } catch {
-      setMessage("❌ Fehler beim Speichern des Stopps");
+      setMeldung("Fehler beim Hinzufügen des Stopps.");
+    } finally {
+      setLoading(false);
     }
   }
 
   // Stopp löschen
-  async function deleteStopp(id) {
+  async function stoppLoeschen(id) {
+    if (!window.confirm("Diesen Stopp wirklich löschen?")) return;
     try {
       await api.deleteStopp(id);
-      setStopps(stopps.filter((s) => s.id !== id));
-      setMessage("🗑️ Stopp gelöscht");
+      setStopps((prev) => prev.filter((s) => s.id !== id));
     } catch {
-      setMessage("❌ Fehler beim Löschen des Stopps");
+      setMeldung("Fehler beim Löschen des Stopps.");
     }
   }
 
   return (
     <div className="space-y-6">
-      {/* Kopfbereich */}
-      <div className="bg-white shadow rounded-lg p-6 flex flex-wrap items-end gap-4">
+      <h1 className="text-2xl font-bold text-[#0058A3]">Tourenplanung</h1>
+
+      {/* Auswahl */}
+      <div className="bg-white shadow rounded-lg p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Fahrer</label>
           <select
             value={selectedFahrer}
             onChange={(e) => setSelectedFahrer(e.target.value)}
-            className="border rounded-md px-3 py-2"
+            className="border rounded-md px-3 py-2 w-full"
           >
+            <option value="">– bitte wählen –</option>
             {fahrer.map((f) => (
               <option key={f.id} value={f.id}>
                 {f.name}
@@ -108,157 +128,122 @@ export default function Planung() {
             ))}
           </select>
         </div>
-
         <div>
           <label className="block text-sm font-semibold mb-1">Datum</label>
           <input
             type="date"
             value={datum}
             onChange={(e) => setDatum(e.target.value)}
-            className="border rounded-md px-3 py-2"
+            className="border rounded-md px-3 py-2 w-full"
           />
         </div>
-
-        <button
-          onClick={ladeTour}
-          className="bg-[#0058A3] text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-800 transition"
-        >
-          Tour laden
-        </button>
-
-        <button
-          onClick={createTour}
-          className="bg-green-600 text-white font-semibold px-4 py-2 rounded-md hover:bg-green-700 transition"
-        >
-          Neue Tour anlegen
-        </button>
+        <div className="flex items-end">
+          <button
+            onClick={anlegen}
+            className="bg-[#0058A3] text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-800 transition w-full"
+          >
+            Tour anlegen
+          </button>
+        </div>
       </div>
 
-      {message && (
-        <div className="text-sm text-gray-700 bg-gray-100 px-4 py-2 rounded-md">
-          {message}
-        </div>
-      )}
-
-      {/* Stopp hinzufügen */}
+      {/* Neue Stopps */}
       {tour && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-[#0058A3] mb-4">
-            Stopp hinzufügen
+        <div className="bg-white shadow rounded-lg p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-[#0058A3]">
+            Stopps hinzufügen
           </h2>
-          <form onSubmit={addStopp} className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <input
-              type="text"
-              placeholder="Kunde *"
-              value={neuerStopp.kunde}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, kunde: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Adresse *"
-              value={neuerStopp.adresse}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, adresse: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-              required
-            />
-            <input
-              type="text"
-              placeholder="Kommission"
-              value={neuerStopp.kommission}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, kommission: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Hinweis"
-              value={neuerStopp.hinweis}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, hinweis: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Telefon"
-              value={neuerStopp.telefon}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, telefon: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-            />
-            <input
-              type="number"
-              placeholder="Position"
-              value={neuerStopp.position}
-              onChange={(e) =>
-                setNeuerStopp({ ...neuerStopp, position: e.target.value })
-              }
-              className="border rounded-md px-3 py-2"
-            />
-
-            <button
-              type="submit"
-              className="bg-[#0058A3] text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-800 transition md:col-span-3 lg:col-span-6"
-            >
-              Stopp speichern
-            </button>
-          </form>
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            {["kunde", "adresse", "kommission", "hinweis", "telefon", "position"].map(
+              (field) => (
+                <input
+                  key={field}
+                  type="text"
+                  placeholder={field.charAt(0).toUpperCase() + field.slice(1)}
+                  value={neuerStopp[field]}
+                  onChange={(e) =>
+                    setNeuerStopp({ ...neuerStopp, [field]: e.target.value })
+                  }
+                  className="border rounded-md px-3 py-2 w-full text-sm"
+                />
+              )
+            )}
+          </div>
+          <button
+            onClick={stoppHinzufuegen}
+            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition"
+          >
+            ➕ Stopp hinzufügen
+          </button>
         </div>
       )}
 
-      {/* Stoppliste */}
-      {stopps.length > 0 && (
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-semibold text-[#0058A3] mb-4">
-            Aktuelle Stopps
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-sm">
-              <thead className="bg-[#0058A3] text-white">
-                <tr>
-                  <th className="py-2 px-3 text-left">Kunde</th>
-                  <th className="py-2 px-3 text-left">Adresse</th>
-                  <th className="py-2 px-3 text-left">Kommission</th>
-                  <th className="py-2 px-3 text-left">Hinweis</th>
-                  <th className="py-2 px-3 text-left">Telefon</th>
-                  <th className="py-2 px-3 text-left">Position</th>
-                  <th className="py-2 px-3 text-center">Aktionen</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stopps.map((s) => (
-                  <tr
-                    key={s.id}
-                    className="border-b hover:bg-gray-50 transition"
-                  >
-                    <td className="py-2 px-3">{s.kunde}</td>
-                    <td className="py-2 px-3">{s.adresse}</td>
-                    <td className="py-2 px-3">{s.kommission}</td>
-                    <td className="py-2 px-3">{s.hinweis}</td>
-                    <td className="py-2 px-3">{s.telefon}</td>
-                    <td className="py-2 px-3">{s.position}</td>
-                    <td className="py-2 px-3 text-center">
-                      <button
-                        onClick={() => deleteStopp(s.id)}
-                        className="text-red-600 hover:underline"
-                      >
-                        Löschen
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      {/* Meldung */}
+      {meldung && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-2 rounded">
+          {meldung}
         </div>
+      )}
+
+      {/* Tabelle */}
+      {stopps.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-4 overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-[#0058A3] text-white">
+              <tr>
+                <th className="px-3 py-2 text-left">#</th>
+                <th className="px-3 py-2 text-left">Kunde</th>
+                <th className="px-3 py-2 text-left">Adresse</th>
+                <th className="px-3 py-2 text-left">Kommission</th>
+                <th className="px-3 py-2 text-left">Hinweis</th>
+                <th className="px-3 py-2 text-left">Telefon</th>
+                <th className="px-3 py-2 text-left">Position</th>
+                <th className="px-3 py-2 text-center">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stopps.map((r, i) => (
+                <tr
+                  key={r.id}
+                  className="border-b hover:bg-gray-50 transition-colors"
+                >
+                  <td className="px-3 py-2">{i + 1}</td>
+                  <td className="px-3 py-2">{r.kunde}</td>
+                  <td className="px-3 py-2">{r.adresse}</td>
+                  <td className="px-3 py-2">{r.kommission}</td>
+                  <td className="px-3 py-2">{r.hinweis}</td>
+                  <td className="px-3 py-2">
+                    {r.telefon ? (
+                      <a
+                        href={`tel:${r.telefon}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {r.telefon}
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="px-3 py-2">{r.position}</td>
+                  <td className="px-3 py-2 text-center">
+                    <button
+                      onClick={() => stoppLoeschen(r.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      ❌
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!loading && !tour && (
+        <p className="text-gray-500 italic">
+          Bitte Fahrer und Datum wählen, um Tour zu laden oder anzulegen.
+        </p>
       )}
     </div>
   );
