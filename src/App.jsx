@@ -1,8 +1,8 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
 import Planung from "./pages/Planung";
-// Tagestour-Seite existiert bereits bei dir:
 import Tagestour from "./pages/Tagestour";
+import Gesamtuebersicht from "./pages/Gesamtuebersicht";
 
 const Layout = ({ children }) => {
   const location = useLocation();
@@ -30,6 +30,9 @@ const Layout = ({ children }) => {
           <Link to="/tagestour" className={`block px-4 py-2 rounded-md ${active("/tagestour")}`}>
             Tagestour
           </Link>
+          <Link to="/gesamtuebersicht" className={`block px-4 py-2 rounded-md ${active("/gesamtuebersicht")}`}>
+            Gesamtübersicht
+          </Link>
         </nav>
 
         <div className="p-4 border-t border-white/20 text-sm space-y-1">
@@ -47,10 +50,8 @@ const Layout = ({ children }) => {
 };
 
 export default function App() {
-  // Token muss gesetzt sein (API_TOKEN)
   const token = localStorage.getItem("token");
   if (!token) {
-    // Kleines Minimal-Login (optional)
     return (
       <div className="min-h-screen grid place-items-center bg-gray-50">
         <div className="bg-white p-6 rounded-lg shadow w-full max-w-sm">
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/planung" replace />} />
           <Route path="/planung" element={<Planung />} />
           <Route path="/tagestour" element={<Tagestour />} />
+          <Route path="/gesamtuebersicht" element={<Gesamtuebersicht />} />
           <Route path="*" element={<div>Not Found</div>} />
         </Routes>
       </Layout>
