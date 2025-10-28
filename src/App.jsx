@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
-import Dashboard from "./pages/Dashboard";
-import Tagestour from "./pages/Tagestour";
 import Planung from "./pages/Planung";
+import Tagestour from "./pages/Tagestour";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
 import Login from "./pages/Login";
 import { api } from "./api";
 
 function MainLayout() {
-  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [activeTab, setActiveTab] = useState("Planung");
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
@@ -30,16 +29,14 @@ function MainLayout() {
 
   const renderContent = () => {
     switch (activeTab) {
-      case "Dashboard":
-        return <Dashboard />;
-      case "Tagestour":
-        return <Tagestour />;
       case "Planung":
         return <Planung />;
+      case "Tagestour":
+        return <Tagestour />;
       case "Gesamtübersicht":
         return <Gesamtuebersicht />;
       default:
-        return <Dashboard />;
+        return <Planung />;
     }
   };
 
@@ -54,22 +51,21 @@ function MainLayout() {
             </h1>
           </div>
 
+          {/* Navigation */}
           <nav className="mt-6 flex flex-col">
-            {["Dashboard", "Tagestour", "Planung", "Gesamtübersicht"].map(
-              (tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`text-left px-6 py-3 text-sm font-medium transition ${
-                    activeTab === tab
-                      ? "bg-blue-900"
-                      : "hover:bg-blue-800 text-blue-100"
-                  }`}
-                >
-                  {tab}
-                </button>
-              )
-            )}
+            {["Planung", "Tagestour", "Gesamtübersicht"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`text-left px-6 py-3 text-sm font-medium transition ${
+                  activeTab === tab
+                    ? "bg-blue-900"
+                    : "hover:bg-blue-800 text-blue-100"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
           </nav>
         </div>
 
