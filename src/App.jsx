@@ -1,22 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useNavigate } from "react-router-dom";
 import { LogOut } from "lucide-react";
+import Dashboard from "./pages/Dashboard";
 import Tagestour from "./pages/Tagestour";
 import Planung from "./pages/Planung";
 import Gesamtuebersicht from "./pages/Gesamtuebersicht";
 import Login from "./pages/Login";
 import { api } from "./api";
 
-function Dashboard() {
-  const [activeTab, setActiveTab] = useState("Tagestour");
+function MainLayout() {
+  const [activeTab, setActiveTab] = useState("Dashboard");
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    api.me().then(setUser).catch(() => {
-      localStorage.removeItem("token");
-      navigate("/login");
-    });
+    api
+      .me()
+      .then(setUser)
+      .catch(() => {
+        localStorage.removeItem("token");
+        navigate("/login");
+      });
   }, [navigate]);
 
   function logout() {
@@ -26,6 +30,8 @@ function Dashboard() {
 
   const renderContent = () => {
     switch (activeTab) {
+      case "Dashboard":
+        return <Dashboard />;
       case "Tagestour":
         return <Tagestour />;
       case "Planung":
@@ -33,7 +39,7 @@ function Dashboard() {
       case "Gesamtübersicht":
         return <Gesamtuebersicht />;
       default:
-        return <Tagestour />;
+        return <Dashboard />;
     }
   };
 
@@ -49,19 +55,21 @@ function Dashboard() {
           </div>
 
           <nav className="mt-6 flex flex-col">
-            {["Tagestour", "Planung", "Gesamtübersicht"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`text-left px-6 py-3 text-sm font-medium transition ${
-                  activeTab === tab
-                    ? "bg-blue-900"
-                    : "hover:bg-blue-800 text-blue-100"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
+            {["Dashboard", "Tagestour", "Planung", "Gesamtübersicht"].map(
+              (tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`text-left px-6 py-3 text-sm font-medium transition ${
+                    activeTab === tab
+                      ? "bg-blue-900"
+                      : "hover:bg-blue-800 text-blue-100"
+                  }`}
+                >
+                  {tab}
+                </button>
+              )
+            )}
           </nav>
         </div>
 
@@ -93,7 +101,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/*" element={<Dashboard />} />
+        <Route path="/*" element={<MainLayout />} />
       </Routes>
     </BrowserRouter>
   );
