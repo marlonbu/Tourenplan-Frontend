@@ -7,11 +7,12 @@ export default function MapView({ stopps = [] }) {
   const [loading, setLoading] = useState(true);
   const mapId = "map-" + Math.random().toString(36).substring(7);
 
+  // 📍 Exakte Koordinaten der Firma Hans Gehlenborg GmbH
   const startpunkt = {
     name: "Hans Gehlenborg GmbH",
     adresse: "Fehnstraße 3, 49699 Lindern",
-    lat: 52.8569, // exakte Geokoordinaten
-    lng: 7.7677,
+    lat: 52.85327,
+    lng: 7.76821,
   };
 
   // Adressen -> Koordinaten (Geocoding mit Fallback)
@@ -70,7 +71,7 @@ export default function MapView({ stopps = [] }) {
   useEffect(() => {
     if (!coords || coords.length === 0 || loading) return;
 
-    const map = L.map(mapId).setView([startpunkt.lat, startpunkt.lng], 10);
+    const map = L.map(mapId).setView([startpunkt.lat, startpunkt.lng], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution:
@@ -81,9 +82,9 @@ export default function MapView({ stopps = [] }) {
 
     // Startmarker
     const startIcon = L.divIcon({
-      html: `<div style="background-color:#16a34a;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">S</div>`,
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
+      html: `<div style="background-color:#16a34a;color:white;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:14px;">S</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
     });
     L.marker([startpunkt.lat, startpunkt.lng], { icon: startIcon })
       .addTo(map)
@@ -108,6 +109,7 @@ export default function MapView({ stopps = [] }) {
             }<br><i>Adresse gefunden</i>`
           );
       } else {
+        // Fallback-Marker
         L.marker([startpunkt.lat, startpunkt.lng], { icon: redIcon })
           .addTo(map)
           .bindPopup(
@@ -116,9 +118,13 @@ export default function MapView({ stopps = [] }) {
       }
     });
 
-    // Autozoom
-    const bounds = L.latLngBounds(allCoords);
-    map.fitBounds(bounds, { padding: [50, 50] });
+    // Autozoom (nur wenn Stopps existieren)
+    if (allCoords.length > 1) {
+      const bounds = L.latLngBounds(allCoords);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      map.setView([startpunkt.lat, startpunkt.lng], 15);
+    }
 
     // Route anzeigen (OSRM)
     async function ladeRoute() {
