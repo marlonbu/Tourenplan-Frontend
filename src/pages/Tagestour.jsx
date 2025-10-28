@@ -1,184 +1,157 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
 import MapView from "../components/MapView";
 
 export default function Tagestour() {
-  const [me, setMe] = useState(null);
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
-  const [datum, setDatum] = useState(new Date().toISOString().split("T")[0]);
+  const [datum, setDatum] = useState("");
+  const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
-  const [tourInfo, setTourInfo] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [meldung, setMeldung] = useState("");
 
+  // Fahrer laden
   useEffect(() => {
-    api.me().then(setMe).catch(() => setError("Fehler beim Laden des Benutzers"));
-  }, []);
-
-  useEffect(() => {
-    if (!me) return;
     api
       .listFahrer()
-      .then((list) => {
-        setFahrer(list);
-        if (me.role === "fahrer" && me.fahrer_id) {
-          setSelectedFahrer(String(me.fahrer_id));
-        } else if (list.length) {
-          setSelectedFahrer(String(list[0].id));
-        }
-      })
-      .catch(() => setError("Fehler beim Laden der Fahrer"));
-  }, [me]);
+      .then(setFahrer)
+      .catch(() => setMeldung("❌ Fehler beim Laden der Fahrer."));
+  }, []);
 
+  // Tour laden
   async function ladeTour() {
-    if (!selectedFahrer || !datum) return;
+    if (!selectedFahrer || !datum) {
+      setMeldung("❌ Bitte Fahrer und Datum wählen.");
+      return;
+    }
+    setMeldung("");
     setLoading(true);
     try {
-      const data = await api.getTourForDay(selectedFahrer, datum);
-      setTourInfo(data.tour);
-      setStopps(data.stopps);
-      setError("");
-    } catch {
-      setError("Fehler beim Laden der Tour");
+      const res = await api.getTourByFahrerUndDatum(selectedFahrer, datum);
+      if (!res.tour) {
+        setTour(null);
+        setStopps([]);
+        setMeldung("ℹ️ Keine Tour für diesen Tag gefunden.");
+      } else {
+        setTour(res.tour);
+        setStopps(res.stopps || []);
+        setMeldung("");
+      }
+    } catch (err) {
+      console.error(err);
+      setMeldung("❌ Fehler beim Laden der Tour.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleFotoUpload(stoppId, file) {
-    try {
-      await api.uploadFoto(stoppId, file);
-      ladeTour();
-    } catch {
-      alert("Foto-Upload fehlgeschlagen");
-    }
-  }
-
-  useEffect(() => {
-    if (selectedFahrer) ladeTour();
-  }, [selectedFahrer, datum]);
-
-  if (!me) {
-    return <div className="text-gray-500">Lade Benutzer…</div>;
-  }
-
-  const isAdmin = me.role === "admin";
-
   return (
-    <div className="space-y-4">
-      {/* Filterleiste */}
-      <div className="flex flex-wrap items-end gap-4 bg-white shadow rounded-lg p-4">
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold text-[#0058A3]">Tagestour</h1>
+
+      {/* Auswahlbereich */}
+      <div className="bg-white shadow rounded-lg p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-semibold mb-1">Fahrer</label>
-          {isAdmin ? (
-            <select
-              value={selectedFahrer}
-              onChange={(e) => setSelectedFahrer(e.target.value)}
-              className="border rounded-md px-3 py-2"
-            >
-              {fahrer.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              className="border rounded-md px-3 py-2 bg-gray-100"
-              value={fahrer[0]?.name || "Mein Fahrerprofil"}
-              disabled
-              readOnly
-            />
-          )}
+          <select
+            value={selectedFahrer}
+            onChange={(e) => setSelectedFahrer(e.target.value)}
+            className="border rounded-md px-3 py-2 w-full"
+          >
+            <option value="">– bitte wählen –</option>
+            {fahrer.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
         </div>
-
         <div>
           <label className="block text-sm font-semibold mb-1">Datum</label>
           <input
             type="date"
             value={datum}
             onChange={(e) => setDatum(e.target.value)}
-            className="border rounded-md px-3 py-2"
+            className="border rounded-md px-3 py-2 w-full"
           />
         </div>
-
-        <button
-          onClick={ladeTour}
-          className="btn-primary mt-2 sm:mt-0"
-          disabled={!selectedFahrer}
-        >
-          Tour laden
-        </button>
+        <div className="flex items-end">
+          <button
+            onClick={ladeTour}
+            disabled={loading}
+            className="w-full bg-[#0058A3] text-white font-semibold px-4 py-2 rounded-md hover:bg-blue-800 transition disabled:opacity-60"
+          >
+            {loading ? "Lädt ..." : "Tour laden"}
+          </button>
+        </div>
       </div>
 
-      {error && <p className="text-red-600">{error}</p>}
-      {loading && <p>Lade Tour…</p>}
-
-      {tourInfo && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Tabelle */}
-          <div className="bg-white shadow rounded-lg p-4 table-container overflow-auto">
-            <table>
-              <thead>
-                <tr>
-                  <th>Kunde</th>
-                  <th>Adresse</th>
-                  <th>Kommission</th>
-                  <th>Hinweis</th>
-                  <th>Telefon</th>
-                  <th>Foto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stopps.map((s) => (
-                  <tr key={s.id}>
-                    <td>{s.kunde}</td>
-                    <td>{s.adresse}</td>
-                    <td>{s.kommission}</td>
-                    <td>{s.hinweis}</td>
-                    <td>{s.telefon}</td>
-                    <td>
-                      {s.foto_url ? (
-                        <a
-                          href={s.foto_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[#0058A3] hover:underline"
-                        >
-                          📷 anzeigen
-                        </a>
-                      ) : (
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) =>
-                            handleFotoUpload(s.id, e.target.files[0])
-                          }
-                        />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!stopps.length && (
-                  <tr>
-                    <td
-                      colSpan="6"
-                      className="text-center text-gray-400 italic py-3"
-                    >
-                      Keine Stopps vorhanden
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Karte */}
-          <div className="bg-white shadow rounded-lg p-4 h-[500px]">
-            <MapView stopps={stopps} />
-          </div>
+      {/* Meldungen */}
+      {meldung && (
+        <div
+          className={`px-4 py-3 rounded-md text-sm shadow ${
+            meldung.startsWith("❌")
+              ? "bg-red-50 border border-red-300 text-red-700"
+              : "bg-blue-50 border border-blue-300 text-blue-700"
+          }`}
+        >
+          {meldung}
         </div>
+      )}
+
+      {/* Stopp-Tabelle */}
+      {tour && stopps.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-4 overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-[#0058A3] text-white">
+              <tr>
+                <th className="px-3 py-2 text-left">#</th>
+                <th className="px-3 py-2 text-left">Kunde</th>
+                <th className="px-3 py-2 text-left">Adresse</th>
+                <th className="px-3 py-2 text-left">Kommission</th>
+                <th className="px-3 py-2 text-left">Hinweis</th>
+                <th className="px-3 py-2 text-left">Telefon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stopps.map((s, i) => (
+                <tr key={s.id} className="border-b hover:bg-gray-50">
+                  <td className="px-3 py-2">{i + 1}</td>
+                  <td className="px-3 py-2">{s.kunde}</td>
+                  <td className="px-3 py-2">{s.adresse}</td>
+                  <td className="px-3 py-2">{s.kommission}</td>
+                  <td className="px-3 py-2">{s.hinweis}</td>
+                  <td className="px-3 py-2">
+                    {s.telefon ? (
+                      <a
+                        href={`tel:${s.telefon}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {s.telefon}
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Karte */}
+      {tour && stopps.length > 0 && (
+        <div className="bg-white shadow rounded-lg p-4">
+          <MapView stopps={stopps} />
+        </div>
+      )}
+
+      {!tour && !meldung && (
+        <p className="text-gray-500 italic">
+          Bitte Fahrer und Datum wählen, um die Tagestour zu laden.
+        </p>
       )}
     </div>
   );
