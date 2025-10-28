@@ -102,3 +102,29 @@ export const api = {
     return request("/stopps");
   },
 };
+// Fahrer hinzufügen
+addFahrer: async (name) => {
+  const res = await fetch(`${API_URL}/fahrer`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error("Fehler beim Hinzufügen");
+  return res.json();
+},
+
+// Fahrer löschen
+deleteFahrer: async (id) => {
+  const res = await fetch(`${API_URL}/fahrer/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem("token")}`,
+    },
+  });
+  if (!res.ok) throw new Error("Fehler beim Löschen");
+  return res.json();
+},
+
