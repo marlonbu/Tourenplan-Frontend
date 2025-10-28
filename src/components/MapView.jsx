@@ -13,11 +13,12 @@ export default function MapView({ stopps = [] }) {
     lng: 7.7747,
   };
 
-  // Adressen automatisch in Koordinaten umwandeln
+  // Adressen in Koordinaten umwandeln (mit Fallback)
   useEffect(() => {
     async function geocode() {
       if (!stopps || stopps.length === 0) return;
       const results = [];
+
       for (const s of stopps) {
         try {
           const q = encodeURIComponent(s.adresse);
@@ -25,23 +26,41 @@ export default function MapView({ stopps = [] }) {
             `https://nominatim.openstreetmap.org/search?format=json&q=${q}`
           );
           const data = await res.json();
+
           if (data.length > 0) {
             results.push({
               ...s,
               lat: parseFloat(data[0].lat),
               lng: parseFloat(data[0].lon),
+              found: true,
+            });
+          } else {
+            console.warn("Adresse nicht gefunden:", s.adresse);
+            results.push({
+              ...s,
+              lat: null,
+              lng: null,
+              found: false,
             });
           }
         } catch (err) {
           console.error("Geocoding-Fehler:", err);
+          results.push({
+            ...s,
+            lat: null,
+            lng: null,
+            found: false,
+          });
         }
       }
+
       setCoords(results);
     }
+
     geocode();
   }, [stopps]);
 
-  // Karte aufbauen
+  // Karte + Route aufbauen
   useEffect(() => {
     if (!coords || coords.length === 0) return;
 
@@ -52,7 +71,9 @@ export default function MapView({ stopps = [] }) {
         '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
     }).addTo(map);
 
-    // Startpunkt-Marker
+    const allCoords = [[startpunkt.lat, startpunkt.lng]];
+
+    // Startpunkt
     const startIcon = L.divIcon({
       html: `<div style="background-color:#16a34a;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">S</div>`,
       iconSize: [28, 28],
@@ -69,18 +90,61 @@ export default function MapView({ stopps = [] }) {
       popupAnchor: [0, -30],
     });
 
-    const allCoords = [[startpunkt.lat, startpunkt.lng]];
-
+    // Stopps darstellen (auch mit Fallback)
     coords.forEach((s) => {
-      allCoords.push([s.lat, s.lng]);
-      L.marker([s.lat, s.lng], { icon: redIcon })
-        .addTo(map)
-        .bindPopup(`<b>${s.kunde || "Unbekannt"}</b><br>${s.adresse || ""}`);
+      if (s.lat && s.lng) {
+        allCoords.push([s.lat, s.lng]);
+        L.marker([s.lat, s.lng], { icon: redIcon })
+          .addTo(map)
+          .bindPopup(
+            `<b>${s.kunde || "Unbekannt"}</b><br>${
+              s.adresse || ""
+            }<br><i>Adresse gefunden</i>`
+          );
+      } else {
+        // Fallback-Marker
+        L.marker([startpunkt.lat, startpunkt.lng], { icon: redIcon })
+          .addTo(map)
+          .bindPopup(
+            `<b>${s.kunde || "Unbekannt"}</b><br><i>Adresse nicht gefunden</i>`
+          );
+      }
     });
 
-    // Auto-Zoom auf alle Punkte
+    // Karte auf alle Punkte zoomen
     const bounds = L.latLngBounds(allCoords);
     map.fitBounds(bounds, { padding: [50, 50] });
+
+    // Routenlinie abrufen
+    async function ladeRoute() {
+      if (allCoords.length < 2) return;
+
+      const coordString = allCoords
+        .map((c) => `${c[1]},${c[0]}`)
+        .join("|");
+
+      try {
+        const res = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=full&geometries=geojson`
+        );
+        const data = await res.json();
+
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0].geometry;
+          L.geoJSON(route, {
+            style: {
+              color: "#0058A3",
+              weight: 4,
+              opacity: 0.8,
+            },
+          }).addTo(map);
+        }
+      } catch (err) {
+        console.error("Routing-Fehler:", err);
+      }
+    }
+
+    ladeRoute();
 
     return () => map.remove();
   }, [coords]);
