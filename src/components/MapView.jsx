@@ -1,145 +1,112 @@
 import React, { useEffect } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-  useMap,
-} from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
-// -----------------------------------------------------------
-//  Individueller Marker mit Nummerierung
-// -----------------------------------------------------------
-function createNumberedIcon(number) {
-  return L.divIcon({
-    html: `<div style="
-        background:#0058A3;
-        color:white;
-        width:28px;
-        height:28px;
-        border-radius:50%;
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-size:13px;
-        font-weight:bold;
-        border:2px solid white;
-        box-shadow:0 1px 4px rgba(0,0,0,0.3);
-      ">${number}</div>`,
-    className: "number-icon",
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
-  });
-}
-
-// -----------------------------------------------------------
-//  Auto-Zoom auf alle Stopps
-// -----------------------------------------------------------
-function FitBounds({ stopps }) {
-  const map = useMap();
+export default function MapView({ stopps = [] }) {
+  const mapId = "map-" + Math.random().toString(36).substring(7);
+  const startpunkt = {
+    name: "Hans Gehlenborg GmbH",
+    adresse: "Fehnstraße 3, 49699 Lindern",
+    lat: 52.8637,
+    lng: 7.7747,
+  };
 
   useEffect(() => {
-    if (!stopps?.length) return;
-    const coords = stopps
-      .filter((s) => Array.isArray(s.coords) && s.coords.length === 2)
-      .map((s) => L.latLng(s.coords[0], s.coords[1]));
-    if (coords.length) {
-      const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [40, 40] });
+    if (!stopps || stopps.length === 0) return;
+
+    const map = L.map(mapId).setView([startpunkt.lat, startpunkt.lng], 10);
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>',
+    }).addTo(map);
+
+    // Startpunkt-Marker (grün)
+    const startIcon = L.divIcon({
+      className:
+        "flex items-center justify-center rounded-full bg-green-600 text-white font-bold",
+      html: `<div style="background-color:#16a34a;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">S</div>`,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+    });
+
+    L.marker([startpunkt.lat, startpunkt.lng], { icon: startIcon })
+      .addTo(map)
+      .bindPopup(`<b>${startpunkt.name}</b><br>${startpunkt.adresse}`);
+
+    // Kunden-Marker (rot)
+    const redIcon = L.icon({
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      iconSize: [25, 41],
+      iconAnchor: [12, 41],
+      popupAnchor: [0, -30],
+    });
+
+    const allCoords = [[startpunkt.lat, startpunkt.lng]];
+
+    stopps.forEach((s) => {
+      if (s.position && Array.isArray(s.position)) {
+        const [lat, lng] = s.position;
+        allCoords.push([lat, lng]);
+
+        L.marker([lat, lng], { icon: redIcon })
+          .addTo(map)
+          .bindPopup(
+            `<b>${s.kunde || "Unbekannt"}</b><br>${s.adresse || ""}`
+          );
+      }
+    });
+
+    // Karte auf alle Marker zoomen
+    const bounds = L.latLngBounds(allCoords);
+    map.fitBounds(bounds, { padding: [50, 50] });
+
+    return () => {
+      map.remove();
+    };
+  }, [stopps]);
+
+  // Google Maps Link generieren
+  const buildGoogleMapsLink = () => {
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+      startpunkt.adresse
+    )}`;
+    if (stopps.length > 0) {
+      const waypoints = stopps
+        .map((s) => encodeURIComponent(s.adresse))
+        .filter(Boolean)
+        .join("|");
+      url += `&destination=${encodeURIComponent(
+        stopps[stopps.length - 1].adresse
+      )}`;
+      if (stopps.length > 1) {
+        url += `&waypoints=${waypoints}`;
+      }
     }
-  }, [stopps, map]);
-
-  return null;
-}
-
-// -----------------------------------------------------------
-//  Haupt-Komponente
-// -----------------------------------------------------------
-export default function MapView({ stopps = [] }) {
-  const hasCoords = stopps.filter(
-    (s) => Array.isArray(s.coords) && s.coords.length === 2
-  );
-
-  // Startpunkt (Hans Gehlenborg GmbH, Fehnstraße 3, Lindern)
-  const startCoords = [52.852776, 7.768832];
-
-  // Linienverbindung (Startpunkt + Stopps)
-  const polylineCoords = [startCoords, ...hasCoords.map((s) => s.coords)];
+    url += `&travelmode=driving`;
+    return url;
+  };
 
   return (
-    <div className="table-container mb-6">
-      <MapContainer
-        center={startCoords}
-        zoom={10}
-        className="h-[500px] w-full rounded-lg shadow border border-gray-200"
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-
-        {/* Startpunkt */}
-        <Marker
-          position={startCoords}
-          icon={L.divIcon({
-            html: `<div style="
-              background:#00A86B;
-              color:white;
-              width:30px;
-              height:30px;
-              border-radius:50%;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              font-size:14px;
-              font-weight:bold;
-              border:2px solid white;
-              box-shadow:0 1px 4px rgba(0,0,0,0.3);
-            ">S</div>`,
-            className: "start-icon",
-            iconSize: [30, 30],
-            iconAnchor: [15, 15],
-          })}
+    <div className="w-full">
+      {/* Button oberhalb */}
+      <div className="flex justify-end mb-3">
+        <a
+          href={buildGoogleMapsLink()}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block bg-[#0058A3] text-white px-4 py-2 rounded-md text-sm font-semibold hover:bg-blue-800 transition"
         >
-          <Popup>
-            <strong>Startpunkt:</strong> Hans Gehlenborg GmbH
-            <br />
-            Fehnstraße 3 – 49699 Lindern
-          </Popup>
-        </Marker>
+          In Google Maps öffnen
+        </a>
+      </div>
 
-        {/* Stopps */}
-        {hasCoords.map((s, i) => (
-          <Marker key={s.id || i} position={s.coords} icon={createNumberedIcon(i + 1)}>
-            <Popup>
-              <strong>{s.kunde}</strong>
-              <br />
-              {s.adresse}
-              {s.hinweis && (
-                <>
-                  <br />
-                  <em>{s.hinweis}</em>
-                </>
-              )}
-            </Popup>
-          </Marker>
-        ))}
-
-        {/* Verbindungslinie */}
-        {polylineCoords.length > 1 && (
-          <Polyline
-            positions={polylineCoords}
-            color="#0058A3"
-            weight={4}
-            opacity={0.7}
-          />
-        )}
-
-        <FitBounds stopps={stopps} />
-      </MapContainer>
+      {/* Karte */}
+      <div
+        id={mapId}
+        className="w-full h-[500px] rounded-lg shadow-inner border border-gray-200"
+      ></div>
     </div>
   );
 }
