@@ -2,111 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===============================
-   Globale Layout-Stile
-================================= */
+/* Basis-Farben und globale Layoutanpassung */
 body {
-  @apply bg-gray-100 text-gray-800 font-sans;
+  @apply bg-gehlenborg-gray text-gray-800 font-sans;
 }
 
-h1, h2, h3, h4 {
-  @apply text-[#0058A3] font-semibold;
+/* Karten und Container */
+.card {
+  @apply bg-white rounded-xl shadow-soft p-4;
 }
 
-.container {
-  @apply max-w-6xl mx-auto px-4 py-6;
+/* Buttons */
+.btn {
+  @apply inline-flex items-center justify-center font-semibold rounded-md px-4 py-2 transition;
 }
 
-/* ===============================
-   Buttons
-================================= */
-.btn-primary {
-  @apply bg-[#0058A3] text-white font-medium px-4 py-2 rounded-lg shadow hover:bg-[#004b8b] transition;
+.btn-blue {
+  @apply bg-gehlenborg-blue text-white hover:bg-gehlenborg-dark;
 }
 
-.btn-secondary {
-  @apply bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg hover:bg-gray-300 transition;
+.btn-green {
+  @apply bg-green-600 text-white hover:bg-green-700;
 }
 
-/* ===============================
-   Tabellen
-================================= */
-.table-container {
-  @apply overflow-x-auto rounded-lg border border-gray-200 shadow-sm;
+.btn-red {
+  @apply bg-red-500 text-white hover:bg-red-600;
 }
 
-table {
+/* Tabellen */
+.table {
   @apply w-full border-collapse text-sm;
 }
 
-thead {
-  @apply bg-[#0058A3] text-white;
+.table th {
+  @apply bg-gehlenborg-blue text-white font-semibold text-left px-3 py-2;
 }
 
-th {
-  @apply py-3 px-4 text-left font-semibold;
+.table td {
+  @apply border-b border-gray-200 px-3 py-2;
 }
 
-td {
-  @apply py-3 px-4 border-t border-gray-100;
+/* Input-Felder */
+input,
+select,
+textarea {
+  @apply border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-gehlenborg-blue;
 }
 
-tr:nth-child(even) {
-  @apply bg-gray-50;
+/* Überschriften */
+h1,
+h2,
+h3 {
+  @apply text-gehlenborg-blue font-bold;
 }
-
-tr:hover {
-  @apply bg-blue-50 transition;
-}
-
-/* ===============================
-   Inputs / Select / Date
-================================= */
-input, select {
-  @apply border border-gray-300 rounded-md px-3 py-2 w-full focus:outline-none focus:ring-2 focus:ring-[#0058A3];
-}
-
-/* ===============================
-   Tabs / Navigation
-================================= */
-.navbar {
-  @apply flex items-center justify-between bg-white shadow px-6 py-3 rounded-lg mb-6;
-}
-
-.navbar h1 {
-  @apply text-xl font-semibold text-[#0058A3];
-}
-
-.nav-tabs {
-  @apply flex gap-2;
-}
-
-.nav-tab {
-  @apply px-4 py-2 font-medium rounded-md cursor-pointer transition;
-}
-
-.nav-tab.active {
-  @apply bg-[#0058A3] text-white shadow;
-}
-
-.nav-tab:not(.active) {
-  @apply bg-gray-100 text-gray-700 hover:bg-gray-200;
-}
-/* ===========================================
-   Sidebar Dashboard Layout (Ergänzung)
-=========================================== */
-
-@media (max-width: 768px) {
-  .sidebar {
-    @apply fixed top-0 left-0 h-full z-50 bg-[#0058A3] text-white w-64 transform transition-transform;
-  }
-}
-
-.sidebar-button {
-  @apply text-left w-full px-6 py-3 font-medium hover:bg-blue-800 transition;
-}
-
-.sidebar-button.active {
-  @apply bg-blue-900;
-}
-
