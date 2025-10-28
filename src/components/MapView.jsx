@@ -4,6 +4,7 @@ import "leaflet/dist/leaflet.css";
 
 export default function MapView({ stopps = [] }) {
   const [coords, setCoords] = useState([]);
+  const [loading, setLoading] = useState(true);
   const mapId = "map-" + Math.random().toString(36).substring(7);
 
   const startpunkt = {
@@ -13,10 +14,15 @@ export default function MapView({ stopps = [] }) {
     lng: 7.7747,
   };
 
-  // Adressen in Koordinaten umwandeln (mit Fallback)
+  // Adressen -> Koordinaten (Geocoding mit Fallback)
   useEffect(() => {
     async function geocode() {
-      if (!stopps || stopps.length === 0) return;
+      if (!stopps || stopps.length === 0) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       const results = [];
 
       for (const s of stopps) {
@@ -35,7 +41,6 @@ export default function MapView({ stopps = [] }) {
               found: true,
             });
           } else {
-            console.warn("Adresse nicht gefunden:", s.adresse);
             results.push({
               ...s,
               lat: null,
@@ -55,14 +60,15 @@ export default function MapView({ stopps = [] }) {
       }
 
       setCoords(results);
+      setLoading(false);
     }
 
     geocode();
   }, [stopps]);
 
-  // Karte + Route aufbauen
+  // Karte + Route
   useEffect(() => {
-    if (!coords || coords.length === 0) return;
+    if (!coords || coords.length === 0 || loading) return;
 
     const map = L.map(mapId).setView([startpunkt.lat, startpunkt.lng], 10);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -73,7 +79,7 @@ export default function MapView({ stopps = [] }) {
 
     const allCoords = [[startpunkt.lat, startpunkt.lng]];
 
-    // Startpunkt
+    // Startmarker
     const startIcon = L.divIcon({
       html: `<div style="background-color:#16a34a;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;">S</div>`,
       iconSize: [28, 28],
@@ -83,6 +89,7 @@ export default function MapView({ stopps = [] }) {
       .addTo(map)
       .bindPopup(`<b>${startpunkt.name}</b><br>${startpunkt.adresse}`);
 
+    // Kundenmarker
     const redIcon = L.icon({
       iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
       iconSize: [25, 41],
@@ -90,7 +97,6 @@ export default function MapView({ stopps = [] }) {
       popupAnchor: [0, -30],
     });
 
-    // Stopps darstellen (auch mit Fallback)
     coords.forEach((s) => {
       if (s.lat && s.lng) {
         allCoords.push([s.lat, s.lng]);
@@ -102,7 +108,6 @@ export default function MapView({ stopps = [] }) {
             }<br><i>Adresse gefunden</i>`
           );
       } else {
-        // Fallback-Marker
         L.marker([startpunkt.lat, startpunkt.lng], { icon: redIcon })
           .addTo(map)
           .bindPopup(
@@ -111,17 +116,18 @@ export default function MapView({ stopps = [] }) {
       }
     });
 
-    // Karte auf alle Punkte zoomen
+    // Autozoom
     const bounds = L.latLngBounds(allCoords);
     map.fitBounds(bounds, { padding: [50, 50] });
 
-    // Routenlinie abrufen
+    // Route anzeigen (OSRM)
     async function ladeRoute() {
-      if (allCoords.length < 2) return;
+      const validCoords = allCoords.filter(
+        (c) => Array.isArray(c) && !isNaN(c[0]) && !isNaN(c[1])
+      );
+      if (validCoords.length < 2) return;
 
-      const coordString = allCoords
-        .map((c) => `${c[1]},${c[0]}`)
-        .join("|");
+      const coordString = validCoords.map((c) => `${c[1]},${c[0]}`).join(";");
 
       try {
         const res = await fetch(
@@ -138,6 +144,8 @@ export default function MapView({ stopps = [] }) {
               opacity: 0.8,
             },
           }).addTo(map);
+        } else {
+          console.warn("Keine Route gefunden.");
         }
       } catch (err) {
         console.error("Routing-Fehler:", err);
@@ -147,7 +155,7 @@ export default function MapView({ stopps = [] }) {
     ladeRoute();
 
     return () => map.remove();
-  }, [coords]);
+  }, [coords, loading]);
 
   // Google Maps Link
   const buildGoogleMapsLink = () => {
@@ -182,11 +190,17 @@ export default function MapView({ stopps = [] }) {
         </a>
       </div>
 
-      {/* Karte */}
-      <div
-        id={mapId}
-        className="w-full h-[500px] rounded-lg shadow-inner border border-gray-200"
-      ></div>
+      {/* Ladeanzeige */}
+      {loading ? (
+        <div className="h-[500px] flex items-center justify-center bg-gray-50 border rounded-lg text-[#0058A3] font-medium">
+          🔄 Karte wird geladen …
+        </div>
+      ) : (
+        <div
+          id={mapId}
+          className="w-full h-[500px] rounded-lg shadow-inner border border-gray-200"
+        ></div>
+      )}
     </div>
   );
 }
