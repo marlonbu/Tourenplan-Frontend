@@ -78,4 +78,27 @@ export const api = {
     if (!res.ok) throw new Error("Fehler beim Bearbeiten des Stopps");
     return res.json();
   },
+
+  // Fotos
+  uploadStoppFoto: async (stopp_id, file) => {
+    const token = localStorage.getItem("token");
+    const form = new FormData();
+    form.append("foto", file);
+
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` }, // KEIN Content-Type hier
+      body: form,
+    });
+    if (!res.ok) throw new Error("Fehler beim Foto-Upload");
+    return res.json();
+  },
+  deleteStoppFoto: async (stopp_id) => {
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
+      method: "DELETE",
+      headers: { Authorization: authHeader().Authorization },
+    });
+    if (!res.ok) throw new Error("Fehler beim Foto-Löschen");
+    return res.json();
+  },
 };
