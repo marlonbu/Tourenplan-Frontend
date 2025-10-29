@@ -1,72 +1,72 @@
-// src/api.js
 const API_URL = import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
-// Hilfsfunktionen
-const getToken = () => localStorage.getItem("token") || "";
-
-const authHeader = (json = true) => {
-  const headers = {
-    Authorization: `Bearer ${getToken()}`,
+const authHeader = () => {
+  const token = localStorage.getItem("token");
+  return {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
   };
-  if (json) headers["Content-Type"] = "application/json";
-  return headers;
 };
 
-// Zentrale Fetch-Hilfe (wirft bei !ok)
-async function request(path, options = {}) {
-  const res = await fetch(`${API_URL}${path}`, options);
-  if (!res.ok) {
-    const txt = await res.text().catch(() => "");
-    throw new Error(txt || `HTTP ${res.status}`);
-  }
-  const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) return res.json();
-  return null;
-}
-
 export const api = {
-  // ===== Fahrer =====
-  listFahrer: async () =>
-    request("/fahrer", {
-      headers: authHeader(false), // nur Auth, kein JSON nötig
-    }),
-
-  addFahrer: async (name) =>
-    request("/fahrer", {
+  // Fahrer
+  listFahrer: async () => {
+    const res = await fetch(`${API_URL}/fahrer`, { headers: authHeader() });
+    if (!res.ok) throw new Error("Fehler beim Laden der Fahrer");
+    return res.json();
+    },
+  addFahrer: async (name) => {
+    const res = await fetch(`${API_URL}/fahrer`, {
       method: "POST",
-      headers: authHeader(true), // JSON-Header WICHTIG
+      headers: authHeader(),
       body: JSON.stringify({ name }),
-    }),
-
-  deleteFahrer: async (id) =>
-    request(`/fahrer/${id}`, {
+    });
+    if (!res.ok) throw new Error("Fehler beim Hinzufügen des Fahrers");
+    return res.json();
+  },
+  deleteFahrer: async (id) => {
+    const res = await fetch(`${API_URL}/fahrer/${id}`, {
       method: "DELETE",
-      headers: authHeader(false),
-    }),
+      headers: { Authorization: authHeader().Authorization },
+    });
+    if (!res.ok) throw new Error("Fehler beim Löschen des Fahrers");
+    return res.json();
+  },
 
-  // ===== Touren / Stopps (für Planung / Tagestour) =====
-  createTour: async (fahrerId, datum) =>
-    request("/touren", {
+  // Touren
+  createTour: async (fahrer_id, datum) => {
+    const res = await fetch(`${API_URL}/touren`, {
       method: "POST",
-      headers: authHeader(true),
-      body: JSON.stringify({ fahrerId, datum }),
-    }),
+      headers: authHeader(),
+      body: JSON.stringify({ fahrer_id, datum }),
+    });
+    if (!res.ok) throw new Error("Fehler beim Anlegen der Tour");
+    return res.json();
+  },
+  getTour: async (fahrerId, datum) => {
+    const res = await fetch(`${API_URL}/touren/${fahrerId}/${datum}`, {
+      headers: { Authorization: authHeader().Authorization },
+    });
+    if (!res.ok) throw new Error("Fehler beim Laden der Tour");
+    return res.json();
+  },
 
-  getTour: async (fahrerId, datum) =>
-    request(`/touren/${fahrerId}/${datum}`, {
-      headers: authHeader(false),
-    }),
-
-  addStopp: async (tourId, stopp) =>
-    request("/stopps", {
+  // Stopps (falls genutzt)
+  addStopp: async (tour_id, payload) => {
+    const res = await fetch(`${API_URL}/stopps/${tour_id}`, {
       method: "POST",
-      headers: authHeader(true),
-      body: JSON.stringify({ tourId, ...stopp }),
-    }),
-
-  deleteStopp: async (id) =>
-    request(`/stopps/${id}`, {
+      headers: authHeader(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Fehler beim Hinzufügen des Stopps");
+    return res.json();
+  },
+  deleteStopp: async (stopp_id) => {
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}`, {
       method: "DELETE",
-      headers: authHeader(false),
-    }),
+      headers: { Authorization: authHeader().Authorization },
+    });
+    if (!res.ok) throw new Error("Fehler beim Löschen des Stopps");
+    return res.json();
+  },
 };
