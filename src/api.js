@@ -14,7 +14,7 @@ export const api = {
     const res = await fetch(`${API_URL}/fahrer`, { headers: authHeader() });
     if (!res.ok) throw new Error("Fehler beim Laden der Fahrer");
     return res.json();
-    },
+  },
   addFahrer: async (name) => {
     const res = await fetch(`${API_URL}/fahrer`, {
       method: "POST",
@@ -51,7 +51,7 @@ export const api = {
     return res.json();
   },
 
-  // Stopps (falls genutzt)
+  // Stopps
   addStopp: async (tour_id, payload) => {
     const res = await fetch(`${API_URL}/stopps/${tour_id}`, {
       method: "POST",
@@ -67,6 +67,15 @@ export const api = {
       headers: { Authorization: authHeader().Authorization },
     });
     if (!res.ok) throw new Error("Fehler beim Löschen des Stopps");
+    return res.json();
+  },
+  updateStopp: async (stopp_id, payload) => {
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}`, {
+      method: "PUT",
+      headers: authHeader(),
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error("Fehler beim Bearbeiten des Stopps");
     return res.json();
   },
 };
