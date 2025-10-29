@@ -1,12 +1,22 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Link,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
+
 import Planung from "./pages/Planung";
 import Tagestour from "./pages/Tagestour";
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const active = (path) =>
-    location.pathname === path ? "bg-white text-[#0058A3]" : "text-white hover:bg-blue-700/60";
+    location.pathname === path
+      ? "bg-white text-[#0058A3]"
+      : "text-white hover:bg-blue-700/60";
 
   const logout = () => {
     localStorage.removeItem("token");
@@ -23,17 +33,25 @@ const Layout = ({ children }) => {
         </div>
 
         <nav className="flex-1 p-3 space-y-2">
-          <Link to="/planung" className={`block px-4 py-2 rounded-md ${active("/planung")}`}>
+          <Link
+            to="/planung"
+            className={`block px-4 py-2 rounded-md ${active("/planung")}`}
+          >
             Planung
           </Link>
-          <Link to="/tagestour" className={`block px-4 py-2 rounded-md ${active("/tagestour")}`}>
+          <Link
+            to="/tagestour"
+            className={`block px-4 py-2 rounded-md ${active("/tagestour")}`}
+          >
             Tagestour
           </Link>
         </nav>
 
         <div className="p-4 border-t border-white/20 text-sm space-y-1">
           <div className="opacity-90">Gehlenborg • Admin</div>
-          <button onClick={logout} className="underline opacity-90">Logout</button>
+          <button onClick={logout} className="underline opacity-90">
+            Logout
+          </button>
         </div>
       </aside>
 
@@ -55,7 +73,8 @@ export default function App() {
         <div className="bg-white p-6 rounded-lg shadow w-full max-w-sm">
           <h1 className="text-xl font-semibold text-[#0058A3] mb-4">Login</h1>
           <p className="text-sm text-gray-600 mb-4">
-            Trage dein API-Token ein (oder nutze Benutzer <b>Gehlenborg</b> / Passwort <b>Orga1023/</b>).
+            Trage dein API-Token ein (oder nutze Benutzer{" "}
+            <b>Gehlenborg</b> / Passwort <b>Orga1023/</b>).
           </p>
           <LoginForm />
         </div>
@@ -84,33 +103,58 @@ function LoginForm() {
   const [token, setToken] = React.useState("");
   const [msg, setMsg] = React.useState("");
 
+  const API_BASE =
+    import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
+
   const handleLogin = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
+    setMsg("");
+
     try {
+      // 1) Manuelles Token erlaubt
       if (token.trim()) {
+        console.log("[Login] Manuelles Token verwendet");
         localStorage.setItem("token", token.trim());
         window.location.reload();
         return;
       }
 
-      const res = await fetch((import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com") + "/login", {
+      // 2) Login gegen Backend
+      console.log("[Login] POST /login...");
+      const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        console.warn("[Login] Backend antwortete nicht OK:", res.status);
+        throw new Error("Login fehlgeschlagen");
+      }
       const data = await res.json();
-      if (!data.token) throw new Error();
+      if (!data.token) {
+        console.warn("[Login] Keine token-Property in Antwort");
+        throw new Error("Kein Token erhalten");
+      }
+
+      console.log("[Login] Token erhalten, speichere in localStorage");
       localStorage.setItem("token", data.token);
       window.location.reload();
-    } catch {
+    } catch (err) {
+      console.error("[Login] Fehler:", err);
       setMsg("❌ Login fehlgeschlagen");
     }
   };
 
+  // Enter-Taste triggert Submit
+  const onKeyDown = (e) => {
+    if (e.key === "Enter") {
+      handleLogin(e);
+    }
+  };
+
   return (
-    <form onSubmit={handleLogin} className="space-y-3">
+    <form onSubmit={handleLogin} onKeyDown={onKeyDown} className="space-y-3">
       <div>
         <label className="text-sm text-gray-600">API-Token (Alternative)</label>
         <input
@@ -120,6 +164,7 @@ function LoginForm() {
           onChange={(e) => setToken(e.target.value)}
         />
       </div>
+
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-sm text-gray-600">Benutzername</label>
@@ -139,9 +184,15 @@ function LoginForm() {
           />
         </div>
       </div>
-      <button className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition w-full">
+
+      <button
+        type="submit"
+        onClick={handleLogin}
+        className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition w-full pointer-events-auto"
+      >
         Anmelden
       </button>
+
       {msg && <div className="text-sm text-red-600">{msg}</div>}
     </form>
   );
