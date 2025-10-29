@@ -25,18 +25,52 @@ export default function Planung() {
     position: 0,
   });
 
+  const [neuerFahrer, setNeuerFahrer] = useState("");
+
   // Fahrer laden
-  useEffect(() => {
+  const loadFahrer = () => {
     api
       .listFahrer()
       .then(setFahrer)
       .catch(() => setMsg("❌ Fehler beim Laden der Fahrer"));
+  };
+
+  useEffect(() => {
+    loadFahrer();
   }, []);
 
   const fahrerName = useMemo(
     () => fahrer.find((f) => String(f.id) === String(fahrerId))?.name || "",
     [fahrer, fahrerId]
   );
+
+  // Fahrer hinzufügen
+  const addFahrer = async () => {
+    if (!neuerFahrer.trim()) {
+      setMsg("⚠️ Bitte Namen eingeben");
+      return;
+    }
+    try {
+      await api.addFahrer(neuerFahrer.trim());
+      setNeuerFahrer("");
+      setMsg("✅ Fahrer hinzugefügt");
+      loadFahrer();
+    } catch {
+      setMsg("❌ Fehler beim Hinzufügen des Fahrers");
+    }
+  };
+
+  // Fahrer löschen
+  const deleteFahrer = async (id) => {
+    if (!window.confirm("Fahrer wirklich löschen?")) return;
+    try {
+      await api.deleteFahrer(id);
+      setMsg("🗑️ Fahrer gelöscht");
+      loadFahrer();
+    } catch {
+      setMsg("❌ Fehler beim Löschen des Fahrers");
+    }
+  };
 
   // Tour laden
   const loadTour = async () => {
@@ -45,7 +79,6 @@ export default function Planung() {
     setMsg("");
     try {
       const data = await api.getTour(fahrerId, datum);
-      // 🔧 Backend liefert bereits { tour, stopps }
       setTour(data.tour || null);
       setStopps(data.stopps || []);
       if (!data.tour) setMsg("ℹ️ Noch keine Tour vorhanden.");
@@ -64,7 +97,7 @@ export default function Planung() {
     }
     setMsg("");
     try {
-      const t = await api.createTour(Number(fahrerId), datum);
+      const t = await api.createTour(Number(fahrerId), datum, []);
       setTour(t);
       setStopps([]);
       setMsg("✅ Tour angelegt");
@@ -85,13 +118,7 @@ export default function Planung() {
       return;
     }
     try {
-      const s = await api.addStopp(tour.id, {
-        kunde: neu.kunde,
-        adresse: neu.adresse,
-        telefon: neu.telefon,
-        hinweis: neu.hinweis,
-        position: Number(neu.position) || 0,
-      });
+      const s = await api.addStopp(tour.id, neu);
       setStopps((prev) => [...prev, s].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
       setNeu({ kunde: "", adresse: "", telefon: "", hinweis: "", position: 0 });
       setMsg("✅ Stopp hinzugefügt");
@@ -115,8 +142,58 @@ export default function Planung() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-[#0058A3]">Planung</h1>
 
-      {/* Auswahl */}
+      {/* Fahrer hinzufügen / löschen */}
       <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <h2 className="text-lg font-semibold text-[#0058A3] mb-3 flex items-center gap-2">
+          👤 Fahrer bearbeiten
+        </h2>
+        <div className="flex gap-3 mb-4">
+          <input
+            className="border rounded-md px-3 py-2 flex-1"
+            placeholder="Neuer Fahrername"
+            value={neuerFahrer}
+            onChange={(e) => setNeuerFahrer(e.target.value)}
+          />
+          <button
+            onClick={addFahrer}
+            className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition"
+          >
+            ➕ Fahrer hinzufügen
+          </button>
+        </div>
+
+        {fahrer.length === 0 ? (
+          <p className="text-sm text-gray-500">Keine Fahrer vorhanden.</p>
+        ) : (
+          <table className="min-w-full text-sm border">
+            <thead>
+              <tr className="bg-[#0058A3] text-white">
+                <th className="px-3 py-2 text-left">Name</th>
+                <th className="px-3 py-2 text-left">Aktionen</th>
+              </tr>
+            </thead>
+            <tbody>
+              {fahrer.map((f) => (
+                <tr key={f.id} className="odd:bg-gray-50">
+                  <td className="px-3 py-2">{f.name}</td>
+                  <td className="px-3 py-2">
+                    <button
+                      onClick={() => deleteFahrer(f.id)}
+                      className="text-red-600 hover:underline"
+                    >
+                      🗑️ Löschen
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Touren anlegen */}
+      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <h2 className="text-lg font-semibold text-[#0058A3] mb-3">🗓️ Tour planen</h2>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
             <label className="text-sm text-gray-600">Fahrer</label>
@@ -133,7 +210,6 @@ export default function Planung() {
               ))}
             </select>
           </div>
-
           <div>
             <label className="text-sm text-gray-600">Datum</label>
             <input
@@ -143,145 +219,19 @@ export default function Planung() {
               className="mt-1 border rounded-md px-3 py-2 w-full"
             />
           </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={createTour}
-              className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition w-full"
-            >
-              Tour anlegen
-            </button>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={loadTour}
-              className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition w-full"
-            >
-              Tour laden
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Neue Stopps */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h2 className="text-lg font-semibold text-[#0058A3] mb-4">Stopp hinzufügen</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
-          <div className="md:col-span-2">
-            <label className="text-sm text-gray-600">Kunde</label>
-            <input
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-              value={neu.kunde}
-              onChange={(e) => setNeu({ ...neu, kunde: e.target.value })}
-              placeholder="Kundenname"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-sm text-gray-600">Adresse</label>
-            <input
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-              value={neu.adresse}
-              onChange={(e) => setNeu({ ...neu, adresse: e.target.value })}
-              placeholder="Straße Hausnr. PLZ Ort"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Telefon</label>
-            <input
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-              value={neu.telefon}
-              onChange={(e) => setNeu({ ...neu, telefon: e.target.value })}
-              placeholder="z. B. 054xx …"
-            />
-          </div>
-          <div>
-            <label className="text-sm text-gray-600">Position</label>
-            <input
-              type="number"
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-              value={neu.position}
-              onChange={(e) => setNeu({ ...neu, position: e.target.value })}
-              placeholder="0"
-            />
-          </div>
-          <div className="md:col-span-6">
-            <label className="text-sm text-gray-600">Hinweis</label>
-            <input
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-              value={neu.hinweis}
-              onChange={(e) => setNeu({ ...neu, hinweis: e.target.value })}
-              placeholder="z. B. Tor 3, vormittags"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4">
           <button
-            onClick={addStopp}
+            onClick={createTour}
             className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition"
           >
-            Stopp hinzufügen
+            Tour anlegen
+          </button>
+          <button
+            onClick={loadTour}
+            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition"
+          >
+            Tour laden
           </button>
         </div>
-      </div>
-
-      {/* Stoppliste */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-[#0058A3]">
-            {tour ? `Tour #${tour.id} – ${fahrerName} (${datum})` : "Keine Tour geladen"}
-          </h2>
-          {loading && <span className="text-sm text-gray-500">Laden…</span>}
-        </div>
-
-        {stopps.length === 0 ? (
-          <p className="text-sm text-gray-500">Noch keine Stopps vorhanden.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="bg-[#0058A3] text-white">
-                  <th className="px-3 py-2 text-left">Pos</th>
-                  <th className="px-3 py-2 text-left">Kunde</th>
-                  <th className="px-3 py-2 text-left">Adresse</th>
-                  <th className="px-3 py-2 text-left">Telefon</th>
-                  <th className="px-3 py-2 text-left">Hinweis</th>
-                  <th className="px-3 py-2 text-left">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stopps.map((s) => (
-                  <tr key={s.id} className="odd:bg-gray-50">
-                    <td className="px-3 py-2">{s.position ?? 0}</td>
-                    <td className="px-3 py-2">{s.kunde}</td>
-                    <td className="px-3 py-2">{s.adresse}</td>
-                    <td className="px-3 py-2">
-                      {s.telefon ? (
-                        <a className="text-[#0058A3] underline" href={`tel:${s.telefon}`}>
-                          {s.telefon}
-                        </a>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-3 py-2">{s.hinweis || "—"}</td>
-                    <td className="px-3 py-2">
-                      <button
-                        onClick={() => deleteStopp(s.id)}
-                        className="text-red-600 hover:underline"
-                        title="Löschen"
-                      >
-                        Löschen 🗑️
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
       </div>
 
       {msg && (
