@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import { BrowserRouter } from "react-router-dom";
 
-// 🔍 Globale Fehleranzeige direkt im Browser
 window.addEventListener("error", (e) => {
   const msg = `❌ JS Error: ${e.message} (${e.filename}:${e.lineno})`;
   document.body.innerHTML = `<pre style="font-family:monospace;padding:1rem;background:#fee;color:#900;border:1px solid #c00">${msg}</pre>`;
@@ -17,6 +17,8 @@ window.addEventListener("unhandledrejection", (e) => {
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>
 );
