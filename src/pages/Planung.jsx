@@ -165,6 +165,31 @@ export default function Planung() {
     }
   };
 
+  // Foto-Upload
+  const onFotoSelected = async (stoppId, file) => {
+    if (!file) return;
+    setMsg("");
+    try {
+      const updated = await api.uploadStoppFoto(stoppId, file);
+      setStopps((prev) => prev.map((s) => (s.id === stoppId ? updated : s)));
+      setMsg("📷 Foto gespeichert");
+    } catch {
+      setMsg("❌ Fehler beim Foto-Upload");
+    }
+  };
+
+  const removeFoto = async (stoppId) => {
+    if (!window.confirm("Foto wirklich löschen?")) return;
+    setMsg("");
+    try {
+      const updated = await api.deleteStoppFoto(stoppId);
+      setStopps((prev) => prev.map((s) => (s.id === stoppId ? updated : s)));
+      setMsg("🗑️ Foto gelöscht");
+    } catch {
+      setMsg("❌ Fehler beim Foto-Löschen");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-[#0058A3]">Planung</h1>
@@ -347,18 +372,53 @@ export default function Planung() {
                   <th className="px-2 py-2 text-left">Telefon</th>
                   <th className="px-2 py-2 text-left">Kommission</th>
                   <th className="px-2 py-2 text-left">Hinweis</th>
+                  <th className="px-2 py-2 text-left">Foto</th>
                   <th className="px-2 py-2 text-left">Aktion</th>
                 </tr>
               </thead>
               <tbody>
                 {stopps.map((s) => (
-                  <tr key={s.id} className="odd:bg-gray-50">
+                  <tr key={s.id} className="odd:bg-gray-50 align-top">
                     <td className="px-2 py-2">{s.position ?? 0}</td>
                     <td className="px-2 py-2">{s.kunde}</td>
                     <td className="px-2 py-2">{s.adresse}</td>
-                    <td className="px-2 py-2">{s.telefon}</td>
-                    <td className="px-2 py-2">{s.kommission}</td>
-                    <td className="px-2 py-2">{s.hinweis}</td>
+                    <td className="px-2 py-2">
+                      {s.telefon ? (
+                        <a className="text-[#0058A3] underline" href={`tel:${s.telefon.replace(/\s+/g, "")}`}>
+                          {s.telefon}
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="px-2 py-2">{s.kommission || "-"}</td>
+                    <td className="px-2 py-2">{s.hinweis || "-"}</td>
+                    <td className="px-2 py-2 space-y-2">
+                      <div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => onFotoSelected(s.id, e.target.files?.[0])}
+                        />
+                      </div>
+                      {s.foto_url ? (
+                        <div className="flex items-center gap-2">
+                          <a
+                            className="text-[#0058A3] underline"
+                            href={s.foto_url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Foto ansehen
+                          </a>
+                          <button className="text-red-600 underline" onClick={() => removeFoto(s.id)}>
+                            Foto löschen
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-gray-500 text-xs">Noch kein Foto</span>
+                      )}
+                    </td>
                     <td className="px-2 py-2">
                       <button
                         onClick={() => deleteStopp(s.id)}
