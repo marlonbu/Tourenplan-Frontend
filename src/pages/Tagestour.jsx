@@ -18,6 +18,7 @@ export default function Tagestour() {
   const [stopps, setStopps] = useState([]);
   const [msg, setMsg] = useState("");
   const [coords, setCoords] = useState([]); // GPS-Koordinaten der Stopps
+  const [isLoadingMap, setIsLoadingMap] = useState(false);
 
   useEffect(() => {
     ladeFahrer();
@@ -38,6 +39,10 @@ export default function Tagestour() {
       alert("Bitte Fahrer und Datum auswählen!");
       return;
     }
+
+    setIsLoadingMap(true);
+    setCoords([]);
+
     try {
       const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
@@ -45,30 +50,36 @@ export default function Tagestour() {
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
 
       if (data.stopps?.length > 0) {
-        // Koordinaten ermitteln
+        // Geokodierung über Nominatim
         const resolved = await Promise.all(
           data.stopps.map(async (s) => {
+            if (!s.adresse) return null;
             try {
               const res = await fetch(
                 `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                  s.adresse || ""
+                  s.adresse
                 )}`
               );
               const json = await res.json();
-              if (json[0]) return [parseFloat(json[0].lat), parseFloat(json[0].lon)];
+              if (json[0]) {
+                return [parseFloat(json[0].lat), parseFloat(json[0].lon)];
+              }
             } catch {
               return null;
             }
             return null;
           })
         );
-        setCoords(resolved.filter(Boolean));
+        const filtered = resolved.filter(Boolean);
+        setCoords(filtered);
       } else {
         setCoords([]);
       }
     } catch (err) {
       console.error("Fehler:", err);
       setMsg("❌ Tour konnte nicht geladen werden");
+    } finally {
+      setIsLoadingMap(false);
     }
   }
 
@@ -76,9 +87,9 @@ export default function Tagestour() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-[#0058A3]">Tagestour</h1>
 
+      {/* Tourauswahl */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Tour laden</h2>
-
         {msg && <div className="text-sm text-gray-600">{msg}</div>}
 
         <div className="flex flex-wrap gap-3 items-end">
@@ -131,9 +142,9 @@ export default function Tagestour() {
         )}
       </section>
 
+      {/* Stopps */}
       {tour && (
         <>
-          {/* Tabelle */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">
               Stopps dieser Tour
@@ -187,13 +198,25 @@ export default function Tagestour() {
           </section>
 
           {/* Karte */}
-          {coords.length > 0 && (
-            <section className="bg-white p-4 rounded-lg shadow space-y-4">
-              <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
+          <section className="bg-white p-4 rounded-lg shadow space-y-4">
+            <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
+
+            {isLoadingMap && (
+              <div className="text-gray-500 italic py-10 text-center">
+                Karte wird geladen …
+              </div>
+            )}
+
+            {!isLoadingMap && coords.length > 0 && (
               <MapContainer
+                key={coords.length}
                 center={coords[0]}
                 zoom={11}
-                style={{ height: "400px", width: "100%", borderRadius: "10px" }}
+                style={{
+                  height: "500px",
+                  width: "100%",
+                  borderRadius: "10px",
+                }}
               >
                 <TileLayer
                   attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -214,8 +237,14 @@ export default function Tagestour() {
                 ))}
                 <Polyline positions={coords} color="#0058A3" />
               </MapContainer>
-            </section>
-          )}
+            )}
+
+            {!isLoadingMap && coords.length === 0 && (
+              <div className="text-gray-500 italic text-center py-10">
+                Keine Kartenkoordinaten gefunden.
+              </div>
+            )}
+          </section>
         </>
       )}
     </div>
