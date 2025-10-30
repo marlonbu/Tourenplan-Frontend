@@ -1,5 +1,5 @@
-// src/api.js — sendet automatisch Authorization-Header
-// JWT: "Bearer <eyJ...>", Legacy: "Gehlenborg" (ohne Bearer)
+// src/api.js — Zentrale API, setzt automatisch Authorization-Header
+// JWT: "Bearer <eyJ...>", Legacy (falls noch erlaubt): "Gehlenborg"
 
 export const API_URL =
   import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
@@ -9,12 +9,10 @@ function makeAuthHeader() {
   const headers = { "Content-Type": "application/json" };
   if (!token) return headers;
 
-  // JWTs beginnen i. d. R. mit "eyJ"
   if (token.startsWith("eyJ")) {
     headers.Authorization = `Bearer ${token}`;
   } else {
-    // Legacy-Token (z. B. "Gehlenborg") ohne Bearer
-    headers.Authorization = token;
+    headers.Authorization = token; // Legacy
   }
   return headers;
 }
@@ -89,7 +87,7 @@ export const api = {
     return handle(res, "Fehler beim Löschen des Stopps");
   },
 
-  // ---------- Foto Upload/Löschen ----------
+  // ---------- Foto ----------
   async uploadStoppFoto(stopp_id, file) {
     const form = new FormData();
     form.append("foto", file);
@@ -123,6 +121,16 @@ export const api = {
       headers,
     });
     return handle(res, "Fehler beim Foto-Löschen");
+  },
+
+  // ---------- NEU: Fahrer-Anmerkung ----------
+  async updateStoppAnmerkung(id, anmerkung_fahrer) {
+    const res = await fetch(`${API_URL}/stopps/${id}/anmerkung`, {
+      method: "PATCH",
+      headers: makeAuthHeader(),
+      body: JSON.stringify({ anmerkung_fahrer }),
+    });
+    return handle(res, "Fehler beim Speichern der Anmerkung");
   },
 };
 
