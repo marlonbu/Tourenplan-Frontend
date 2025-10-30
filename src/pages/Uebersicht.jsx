@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
 
-// Kleines Utility für hübsches Datumsformat
+// Formatierer
 function fmt(d) {
   try {
     return new Date(d).toLocaleDateString("de-DE");
@@ -11,13 +11,14 @@ function fmt(d) {
 }
 
 export default function Uebersicht() {
-  const [tab, setTab] = useState("gesamt"); // "gesamt" | "woche"
+  const [subTab, setSubTab] = useState("gesamt"); // "gesamt" | "woche"
 
   // Filter
   const [fahrer, setFahrer] = useState([]);
-  const [filterFahrer, setFilterFahrer] = useState(""); // "" = Alle Fahrer
-  const [filterDatum, setFilterDatum] = useState("");   // YYYY-MM-DD
-  const [filterKw, setFilterKw] = useState("");         // YYYY-Www (type="week")
+  const [filterFahrer, setFilterFahrer] = useState("");  // "" = Alle Fahrer
+  const [filterVon, setFilterVon] = useState("");        // YYYY-MM-DD
+  const [filterBis, setFilterBis] = useState("");        // YYYY-MM-DD
+  const [filterKw, setFilterKw] = useState("");          // YYYY-Www
   const [filterKunde, setFilterKunde] = useState("");
 
   // Daten
@@ -27,9 +28,8 @@ export default function Uebersicht() {
 
   useEffect(() => {
     ladeFahrer();
-    // Initial: gesamte Übersicht ohne Filter
-    applyFilter();
-  }, []);
+    applyFilter(); // Initial
+  }, [subTab]);
 
   async function ladeFahrer() {
     try {
@@ -44,8 +44,9 @@ export default function Uebersicht() {
     try {
       setLoading(true);
       setMsg("");
+      // Für "Woche" ignorieren wir Von/Bis und nutzen nur "kw"
       const payload =
-        tab === "woche"
+        subTab === "woche"
           ? {
               fahrer_id: filterFahrer || undefined,
               kw: filterKw || undefined,
@@ -53,16 +54,18 @@ export default function Uebersicht() {
             }
           : {
               fahrer_id: filterFahrer || undefined,
-              datum: filterDatum || undefined,
-              kw: filterKw || undefined, // darf auch im Gesamt-Tab genutzt werden
+              date_from: filterVon || undefined,
+              date_to: filterBis || undefined,
+              kw: filterKw || undefined, // darf zusätzlich genutzt werden
               kunde: filterKunde || undefined,
             };
-      const data = await api.getUebersicht(payload);
+
+      const data = await api.getStoppsUebersicht(payload);
       setRows(data);
-      if (data.length === 0) setMsg("Keine Touren gefunden.");
+      if (data.length === 0) setMsg("Keine Stopps gefunden.");
     } catch (err) {
-      console.error("Übersicht laden fehlgeschlagen:", err);
-      setMsg("❌ Fehler beim Laden der Übersicht");
+      console.error("Stopps-Übersicht laden fehlgeschlagen:", err);
+      setMsg("❌ Fehler beim Laden der Stopps-Übersicht");
     } finally {
       setLoading(false);
     }
@@ -70,7 +73,8 @@ export default function Uebersicht() {
 
   function resetFilter() {
     setFilterFahrer("");
-    setFilterDatum("");
+    setFilterVon("");
+    setFilterBis("");
     setFilterKw("");
     setFilterKunde("");
     setRows([]);
@@ -85,17 +89,17 @@ export default function Uebersicht() {
       <div className="bg-white p-2 rounded-lg shadow flex gap-2">
         <button
           className={`px-4 py-2 rounded-md ${
-            tab === "gesamt" ? "bg-[#0058A3] text-white" : "bg-gray-100"
+            subTab === "gesamt" ? "bg-[#0058A3] text-white" : "bg-gray-100"
           }`}
-          onClick={() => setTab("gesamt")}
+          onClick={() => setSubTab("gesamt")}
         >
           Gesamtübersicht
         </button>
         <button
           className={`px-4 py-2 rounded-md ${
-            tab === "woche" ? "bg-[#0058A3] text-white" : "bg-gray-100"
+            subTab === "woche" ? "bg-[#0058A3] text-white" : "bg-gray-100"
           }`}
-          onClick={() => setTab("woche")}
+          onClick={() => setSubTab("woche")}
         >
           Wochenübersicht
         </button>
@@ -105,7 +109,7 @@ export default function Uebersicht() {
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Filter</h2>
 
-        <div className="grid md:grid-cols-4 gap-3">
+        <div className="grid lg:grid-cols-5 md:grid-cols-3 grid-cols-1 gap-3">
           {/* Fahrer */}
           <div>
             <label className="text-sm text-gray-600 block">Fahrer</label>
@@ -123,15 +127,27 @@ export default function Uebersicht() {
             </select>
           </div>
 
-          {/* Datum (nur im Gesamt-Tab prominent) */}
+          {/* Datum Von */}
           <div>
-            <label className="text-sm text-gray-600 block">Datum</label>
+            <label className="text-sm text-gray-600 block">Datum von</label>
             <input
               type="date"
               className="border rounded-md px-3 py-2 w-full"
-              value={filterDatum}
-              onChange={(e) => setFilterDatum(e.target.value)}
-              disabled={tab === "woche"}
+              value={filterVon}
+              onChange={(e) => setFilterVon(e.target.value)}
+              disabled={subTab === "woche"}
+            />
+          </div>
+
+          {/* Datum Bis */}
+          <div>
+            <label className="text-sm text-gray-600 block">Datum bis</label>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2 w-full"
+              value={filterBis}
+              onChange={(e) => setFilterBis(e.target.value)}
+              disabled={subTab === "woche"}
             />
           </div>
 
@@ -146,7 +162,7 @@ export default function Uebersicht() {
             />
           </div>
 
-          {/* Kunde (Textsuche) */}
+          {/* Kunde */}
           <div>
             <label className="text-sm text-gray-600 block">Kunde</label>
             <input
@@ -177,7 +193,7 @@ export default function Uebersicht() {
 
       {/* Tabelle */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
-        <h2 className="text-lg font-medium text-[#0058A3]">Touren</h2>
+        <h2 className="text-lg font-medium text-[#0058A3]">Stopps</h2>
 
         {loading && <div className="text-gray-500">Laden…</div>}
         {!loading && msg && <div className="text-gray-600">{msg}</div>}
@@ -187,24 +203,34 @@ export default function Uebersicht() {
             <table className="min-w-full border text-sm">
               <thead className="bg-[#0058A3] text-white">
                 <tr>
-                  <th className="border px-2 py-1">Datum</th>
-                  <th className="border px-2 py-1">Fahrer</th>
-                  <th className="border px-2 py-1">Kunden (Auszug)</th>
-                  <th className="border px-2 py-1">Stopps</th>
-                  <th className="border px-2 py-1">Bemerkung Tour</th>
+                  <th className="border px-2 py-1 text-left">Datum</th>
+                  <th className="border px-2 py-1 text-left">Fahrer</th>
+                  <th className="border px-2 py-1 text-left">Pos</th>
+                  <th className="border px-2 py-1 text-left">Kunde</th>
+                  <th className="border px-2 py-1 text-left">Adresse</th>
+                  <th className="border px-2 py-1 text-left">Telefon</th>
+                  <th className="border px-2 py-1 text-left">Kommission</th>
+                  <th className="border px-2 py-1 text-left">Hinweis</th>
+                  <th className="border px-2 py-1 text-left">Anmerkung Fahrer</th>
+                  <th className="border px-2 py-1 text-left">Bemerkung Tour</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.id} className="hover:bg-gray-50">
+                  <tr key={r.stopp_id} className="hover:bg-gray-50">
                     <td className="border px-2 py-1">{fmt(r.datum)}</td>
                     <td className="border px-2 py-1">{r.fahrer_name}</td>
+                    <td className="border px-2 py-1">{r.position ?? ""}</td>
+                    <td className="border px-2 py-1">{r.kunde}</td>
+                    <td className="border px-2 py-1">{r.adresse}</td>
+                    <td className="border px-2 py-1">{r.telefon || <span className="text-gray-400">–</span>}</td>
+                    <td className="border px-2 py-1">{r.kommission || <span className="text-gray-400">–</span>}</td>
+                    <td className="border px-2 py-1">{r.hinweis || <span className="text-gray-400">–</span>}</td>
                     <td className="border px-2 py-1">
-                      {r.kunden_preview || <span className="text-gray-400">–</span>}
+                      {r.anmerkung_fahrer || <span className="text-gray-400">–</span>}
                     </td>
-                    <td className="border px-2 py-1 text-center">{r.stopps_count}</td>
                     <td className="border px-2 py-1">
-                      {r.bemerkung || <span className="text-gray-400">–</span>}
+                      {r.tour_bemerkung || <span className="text-gray-400">–</span>}
                     </td>
                   </tr>
                 ))}
