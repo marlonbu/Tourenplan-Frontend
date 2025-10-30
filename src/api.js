@@ -1,18 +1,15 @@
-// src/api.js — Zentrale API, setzt automatisch Authorization-Header
-// JWT: "Bearer <eyJ...>", Legacy (falls noch erlaubt): "Gehlenborg"
-
+// src/api.js — Zentrale API mit stabilem Login + JWT-Handling
 export const API_URL =
   import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
+// ---------- Hilfsfunktionen ----------
 function makeAuthHeader() {
   const token = localStorage.getItem("token") || "";
   const headers = { "Content-Type": "application/json" };
-  if (!token) return headers;
-
-  if (token.startsWith("eyJ")) {
+  if (token && token.startsWith("eyJ")) {
     headers.Authorization = `Bearer ${token}`;
-  } else {
-    headers.Authorization = token; // Legacy (falls noch aktiv)
+  } else if (token) {
+    headers.Authorization = token; // Legacy
   }
   return headers;
 }
@@ -20,13 +17,36 @@ function makeAuthHeader() {
 async function handle(res, msg) {
   if (!res.ok) {
     let detail = "";
-    try { detail = await res.text(); } catch {}
+    try {
+      detail = await res.text();
+    } catch {}
     throw new Error(detail ? `${msg}: ${detail}` : msg);
   }
   return res.json();
 }
 
+// ---------- API ----------
 export const api = {
+  // ---------- Login ----------
+  async login(username, password) {
+    const res = await fetch(`${API_URL}/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!res.ok) throw new Error("Login fehlgeschlagen");
+
+    const data = await res.json();
+
+    if (!data.token) throw new Error("Kein Token erhalten");
+
+    // ✅ Token im localStorage speichern
+    localStorage.setItem("token", data.token);
+
+    return data;
+  },
+
   // ---------- Fahrer ----------
   async listFahrer() {
     const res = await fetch(`${API_URL}/fahrer`, { headers: makeAuthHeader() });
@@ -73,6 +93,14 @@ export const api = {
     });
     return handle(res, "Fehler beim Hinzufügen des Stopps");
   },
+  async updateStopp(id, data) {
+    const res = await fetch(`${API_URL}/stopps/${id}`, {
+      method: "PATCH",
+      headers: makeAuthHeader(),
+      body: JSON.stringify(data),
+    });
+    return handle(res, "Fehler beim Aktualisieren des Stopps");
+  },
   async deleteStopp(id) {
     const res = await fetch(`${API_URL}/stopps/${id}`, {
       method: "DELETE",
@@ -95,7 +123,7 @@ export const api = {
 
     const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
       method: "POST",
-      headers, // kein Content-Type für FormData
+      headers,
       body: form,
     });
     return handle(res, "Fehler beim Foto-Upload");
@@ -126,24 +154,28 @@ export const api = {
     return handle(res, "Fehler beim Speichern der Anmerkung");
   },
 
-  // ---------- NEU: Admin Tourverwaltung ----------
+  // ---------- Admin / Übersicht ----------
   async getTourenAdmin({ fahrer_id, date_from, date_to, kw, kunde } = {}) {
     const params = new URLSearchParams();
     if (fahrer_id) params.set("fahrer_id", fahrer_id);
     if (date_from) params.set("date_from", date_from);
     if (date_to) params.set("date_to", date_to);
-    if (kw) params.set("kw", kw); // YYYY-Www
+    if (kw) params.set("kw", kw);
     if (kunde) params.set("kunde", kunde);
-    const url = `${API_URL}/touren-admin${params.toString() ? `?${params.toString()}` : ""}`;
+    const url = `${API_URL}/touren-admin${
+      params.toString() ? `?${params.toString()}` : ""
+    }`;
     const res = await fetch(url, { headers: makeAuthHeader() });
     return handle(res, "Fehler beim Laden der Touren");
   },
+
   async getStoppsByTour(tour_id) {
     const res = await fetch(`${API_URL}/touren/${tour_id}/stopps`, {
       headers: makeAuthHeader(),
     });
     return handle(res, "Fehler beim Laden der Stopps");
   },
+
   async updateTour(id, data) {
     const res = await fetch(`${API_URL}/touren/${id}`, {
       method: "PATCH",
@@ -152,6 +184,7 @@ export const api = {
     });
     return handle(res, "Fehler beim Aktualisieren der Tour");
   },
+
   async deleteTour(id) {
     const res = await fetch(`${API_URL}/touren/${id}`, {
       method: "DELETE",
@@ -159,29 +192,6 @@ export const api = {
     });
     return handle(res, "Fehler beim Löschen der Tour");
   },
-  async updateStopp(id, data) {
-    const res = await fetch(`${API_URL}/stopps/${id}`, {
-      method: "PATCH",
-      headers: makeAuthHeader(),
-      body: JSON.stringify(data),
-    });
-    return handle(res, "Fehler beim Aktualisieren des Stopps");
-  },
-};
-
-// ---------- Login (Token speichern) ----------
-api.login = async function (username, password) {
-  const res = await fetch(`${API_URL}/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
-  });
-  if (!res.ok) throw new Error("Login fehlgeschlagen");
-  const data = await res.json();
-  if (!data.token) throw new Error("Kein Token erhalten");
-  // ✅ Token wirklich speichern
-  localStorage.setItem("token", data.token);
-  return data;
 };
 
 export default api;
