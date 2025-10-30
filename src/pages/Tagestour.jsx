@@ -22,9 +22,9 @@ function FitToMarkers({ coords }) {
   useEffect(() => {
     if (coords.length > 0) {
       const bounds = L.latLngBounds(coords);
-      map.flyToBounds(bounds, { padding: [50, 50] });
+      map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [coords]);
+  }, [coords, map]);
   return null;
 }
 
@@ -37,8 +37,6 @@ export default function Tagestour() {
   const [coords, setCoords] = useState([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const [mapReady, setMapReady] = useState(false);
-  const mapRef = useRef(null);
 
   useEffect(() => {
     ladeFahrer();
@@ -62,6 +60,7 @@ export default function Tagestour() {
 
     setLoading(true);
     setCoords([]);
+
     try {
       const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
@@ -82,7 +81,9 @@ export default function Tagestour() {
             if (json[0]) {
               coordsNeu.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
             }
-          } catch {}
+          } catch {
+            /* ignore */
+          }
         }
         setCoords(coordsNeu);
       }
@@ -98,7 +99,6 @@ export default function Tagestour() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-[#0058A3]">Tagestour</h1>
 
-      {/* Auswahl */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Tour laden</h2>
         {msg && <div className="text-sm text-gray-600">{msg}</div>}
@@ -153,7 +153,6 @@ export default function Tagestour() {
         )}
       </section>
 
-      {/* Stopps */}
       {tour && (
         <>
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
@@ -210,46 +209,37 @@ export default function Tagestour() {
             </table>
           </section>
 
-          {/* Karte */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
 
-            {loading && (
+            {loading ? (
               <div className="text-gray-500 italic text-center py-10">
                 Karte wird geladen …
               </div>
-            )}
-
-            {!loading && (
+            ) : (
               <div style={{ height: "500px", width: "100%" }}>
                 <MapContainer
-                  center={[52.9, 8.0]} // Startmittelpunkt Norddeutschland
+                  center={[52.9, 8.0]}
                   zoom={8}
-                  whenCreated={() => setMapReady(true)}
-                  style={{
-                    height: "100%",
-                    width: "100%",
-                    borderRadius: "10px",
-                  }}
+                  style={{ height: "100%", width: "100%", borderRadius: "10px" }}
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {mapReady &&
-                    coords.map((pos, i) => (
-                      <Marker key={i} position={pos} icon={icon}>
-                        <Popup>
-                          <div className="text-sm">
-                            <b>{stopps[i]?.kunde}</b>
-                            <br />
-                            {stopps[i]?.adresse}
-                            <br />
-                            Pos: {stopps[i]?.position || i + 1}
-                          </div>
-                        </Popup>
-                      </Marker>
-                    ))}
+                  {coords.map((pos, i) => (
+                    <Marker key={i} position={pos} icon={icon}>
+                      <Popup>
+                        <div className="text-sm">
+                          <b>{stopps[i]?.kunde}</b>
+                          <br />
+                          {stopps[i]?.adresse}
+                          <br />
+                          Pos: {stopps[i]?.position || i + 1}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
                   {coords.length > 1 && (
                     <>
                       <Polyline positions={coords} color="#0058A3" />
