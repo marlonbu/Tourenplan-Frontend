@@ -1,4 +1,5 @@
-// src/api.js — Zentrale API mit stabilem Login + JWT-Handling
+// src/api.js — Zentrale API mit stabilem JWT-Login, Token-Speicherung und Authorization-Header
+
 export const API_URL =
   import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
@@ -6,18 +7,21 @@ export const API_URL =
 function makeAuthHeader() {
   const token = localStorage.getItem("token") || "";
   const headers = { "Content-Type": "application/json" };
-  if (token && token.startsWith("eyJ")) {
+
+  // 🔒 Token wird nur gesetzt, wenn vorhanden
+  if (token) {
     headers.Authorization = `Bearer ${token}`;
-  } else if (token) {
-    headers.Authorization = token; // Legacy-Fall (normalerweise nicht genutzt)
   }
+
   return headers;
 }
 
 async function handle(res, msg) {
   if (!res.ok) {
     let detail = "";
-    try { detail = await res.text(); } catch {}
+    try {
+      detail = await res.text();
+    } catch {}
     throw new Error(detail ? `${msg}: ${detail}` : msg);
   }
   return res.json();
@@ -25,17 +29,23 @@ async function handle(res, msg) {
 
 // ---------- API ----------
 export const api = {
-  // ---------- Login (speichert Token) ----------
+  // ---------- Login ----------
   async login(username, password) {
     const res = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+
     if (!res.ok) throw new Error("Login fehlgeschlagen");
+
     const data = await res.json();
+
     if (!data.token) throw new Error("Kein Token erhalten");
-    localStorage.setItem("token", data.token); // ✅ Token persistieren
+
+    // ✅ Token speichern
+    localStorage.setItem("token", data.token);
+
     return data;
   },
 
@@ -106,12 +116,7 @@ export const api = {
     const form = new FormData();
     form.append("foto", file);
     const token = localStorage.getItem("token") || "";
-    const headers =
-      token && token.startsWith("eyJ")
-        ? { Authorization: `Bearer ${token}` }
-        : token
-        ? { Authorization: token }
-        : undefined;
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
     const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
       method: "POST",
@@ -122,12 +127,7 @@ export const api = {
   },
   async deleteStoppFoto(stopp_id) {
     const token = localStorage.getItem("token") || "";
-    const headers =
-      token && token.startsWith("eyJ")
-        ? { Authorization: `Bearer ${token}` }
-        : token
-        ? { Authorization: token }
-        : undefined;
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
     const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
       method: "DELETE",
@@ -154,7 +154,11 @@ export const api = {
     if (date_to) params.set("date_to", date_to);
     if (kw) params.set("kw", kw);
     if (kunde) params.set("kunde", kunde);
-    const url = `${API_URL}/touren-admin${params.toString() ? `?${params.toString()}` : ""}`;
+
+    const url = `${API_URL}/touren-admin${
+      params.toString() ? `?${params.toString()}` : ""
+    }`;
+
     const res = await fetch(url, { headers: makeAuthHeader() });
     return handle(res, "Fehler beim Laden der Touren");
   },
