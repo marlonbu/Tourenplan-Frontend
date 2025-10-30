@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { api } from "../api";
 import {
   MapContainer,
@@ -10,6 +10,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 
+// Leaflet-Icon (Standard)
 const icon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconSize: [25, 41],
@@ -17,6 +18,7 @@ const icon = L.icon({
   popupAnchor: [1, -34],
 });
 
+// Hilfskomponente zum automatischen Zoomen auf Marker
 function FitToMarkers({ coords }) {
   const map = useMap();
   useEffect(() => {
@@ -37,6 +39,10 @@ export default function Tagestour() {
   const [coords, setCoords] = useState([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Status je Stopp-ID für Auto-Save: "idle" | "saving" | "saved" | "error"
+  const [saveState, setSaveState] = useState({}); // { [id]: "saving" | ... }
+  const timersRef = useRef({}); // { [id]: timeoutId }
 
   useEffect(() => {
     ladeFahrer();
@@ -60,21 +66,23 @@ export default function Tagestour() {
 
     setLoading(true);
     setCoords([]);
-
+    setSaveState({});
     try {
       const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
-      setStopps(data.stopps || []);
+      const s = data.stopps || [];
+      setStopps(s);
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
 
-      if (data.stopps?.length > 0) {
+      // Geokodierung
+      if (s.length > 0) {
         const coordsNeu = [];
-        for (const s of data.stopps) {
-          if (!s.adresse) continue;
+        for (const st of s) {
+          if (!st.adresse) continue;
           try {
             const res = await fetch(
               `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                s.adresse
+                st.adresse
               )}`
             );
             const json = await res.json();
@@ -82,7 +90,7 @@ export default function Tagestour() {
               coordsNeu.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
             }
           } catch {
-            /* ignore */
+            // ignorieren
           }
         }
         setCoords(coordsNeu);
@@ -95,10 +103,54 @@ export default function Tagestour() {
     }
   }
 
+  // Eingabe-Handler für "Anmerkung Fahrer"
+  function handleAnmerkungChange(id, value) {
+    // UI sofort updaten
+    setStopps((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, anmerkung_fahrer: value } : s))
+    );
+
+    // evtl. laufenden Timer abbrechen
+    if (timersRef.current[id]) {
+      clearTimeout(timersRef.current[id]);
+    }
+
+    // "saving" anzeigen
+    setSaveState((st) => ({ ...st, [id]: "saving" }));
+
+    // Debounce: nach 1s ohne Tipp speichern
+    timersRef.current[id] = setTimeout(() => {
+      saveAnmerkung(id, value);
+    }, 1000);
+  }
+
+  // Sofort speichern bei Blur (Feld verlassen)
+  function handleAnmerkungBlur(id, value) {
+    if (timersRef.current[id]) {
+      clearTimeout(timersRef.current[id]);
+    }
+    saveAnmerkung(id, value);
+  }
+
+  async function saveAnmerkung(id, value) {
+    try {
+      await api.updateStoppAnmerkung(id, value);
+      setSaveState((st) => ({ ...st, [id]: "saved" }));
+      // „saved“ Meldung nach kurzer Zeit wieder ausblenden
+      setTimeout(() => {
+        setSaveState((st) => ({ ...st, [id]: "idle" }));
+      }, 1500);
+    } catch (err) {
+      console.error("Anmerkung speichern fehlgeschlagen:", err);
+      setSaveState((st) => ({ ...st, [id]: "error" }));
+    }
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-[#0058A3]">Tagestour</h1>
 
+      {/* Auswahl */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Tour laden</h2>
         {msg && <div className="text-sm text-gray-600">{msg}</div>}
@@ -153,6 +205,7 @@ export default function Tagestour() {
         )}
       </section>
 
+      {/* Stopps */}
       {tour && (
         <>
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
@@ -169,13 +222,14 @@ export default function Tagestour() {
                   <th className="border px-2 py-1">Telefon</th>
                   <th className="border px-2 py-1">Kommission</th>
                   <th className="border px-2 py-1">Hinweis</th>
+                  <th className="border px-2 py-1">Anmerkung Fahrer</th>
                 </tr>
               </thead>
               <tbody>
                 {stopps.length === 0 && (
                   <tr>
                     <td
-                      colSpan="6"
+                      colSpan="7"
                       className="text-center py-2 text-gray-500 italic"
                     >
                       Keine Stopps vorhanden
@@ -183,7 +237,7 @@ export default function Tagestour() {
                   </tr>
                 )}
                 {stopps.map((s, i) => (
-                  <tr key={s.id || i} className="hover:bg-gray-50">
+                  <tr key={s.id || i} className="hover:bg-gray-50 align-top">
                     <td className="border px-2 py-1 text-center">
                       {s.position}
                     </td>
@@ -203,12 +257,37 @@ export default function Tagestour() {
                     <td className="border px-2 py-1">{s.telefon}</td>
                     <td className="border px-2 py-1">{s.kommission}</td>
                     <td className="border px-2 py-1">{s.hinweis}</td>
+                    <td className="border px-2 py-1 w-[260px]">
+                      <textarea
+                        className="border rounded-md px-2 py-1 w-full resize-y min-h-[34px]"
+                        placeholder='z. B. "ok" oder Problem notieren'
+                        value={s.anmerkung_fahrer || ""}
+                        onChange={(e) =>
+                          handleAnmerkungChange(s.id, e.target.value)
+                        }
+                        onBlur={(e) =>
+                          handleAnmerkungBlur(s.id, e.target.value)
+                        }
+                      />
+                      <div className="text-xs mt-1 h-4">
+                        {saveState[s.id] === "saving" && (
+                          <span className="text-gray-500">💾 Speichern…</span>
+                        )}
+                        {saveState[s.id] === "saved" && (
+                          <span className="text-green-600">✅ Gespeichert</span>
+                        )}
+                        {saveState[s.id] === "error" && (
+                          <span className="text-red-600">❌ Fehler</span>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </section>
 
+          {/* Karte */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
 
@@ -236,6 +315,12 @@ export default function Tagestour() {
                           {stopps[i]?.adresse}
                           <br />
                           Pos: {stopps[i]?.position || i + 1}
+                          {stopps[i]?.anmerkung_fahrer ? (
+                            <>
+                              <br />
+                              <i>Anmerkung: {stopps[i].anmerkung_fahrer}</i>
+                            </>
+                          ) : null}
                         </div>
                       </Popup>
                     </Marker>
