@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { api } from "../api";
-import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 
 const icon = L.icon({
@@ -10,15 +10,27 @@ const icon = L.icon({
   popupAnchor: [1, -34],
 });
 
+function FitToMarkers({ coords }) {
+  const map = useMap();
+  useEffect(() => {
+    if (coords.length > 0) {
+      const bounds = L.latLngBounds(coords);
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+  }, [coords]);
+  return null;
+}
+
 export default function Tagestour() {
   const [fahrer, setFahrer] = useState([]);
   const [selectedFahrer, setSelectedFahrer] = useState("");
   const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
+  const [coords, setCoords] = useState([]);
   const [msg, setMsg] = useState("");
-  const [coords, setCoords] = useState([]); // GPS-Koordinaten der Stopps
-  const [isLoadingMap, setIsLoadingMap] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const mapRef = useRef();
 
   useEffect(() => {
     ladeFahrer();
@@ -40,7 +52,7 @@ export default function Tagestour() {
       return;
     }
 
-    setIsLoadingMap(true);
+    setLoading(true);
     setCoords([]);
 
     try {
@@ -50,36 +62,30 @@ export default function Tagestour() {
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
 
       if (data.stopps?.length > 0) {
-        // Geokodierung über Nominatim
-        const resolved = await Promise.all(
-          data.stopps.map(async (s) => {
-            if (!s.adresse) return null;
-            try {
-              const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                  s.adresse
-                )}`
-              );
-              const json = await res.json();
-              if (json[0]) {
-                return [parseFloat(json[0].lat), parseFloat(json[0].lon)];
-              }
-            } catch {
-              return null;
+        const results = [];
+        for (const s of data.stopps) {
+          if (!s.adresse) continue;
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                s.adresse
+              )}`
+            );
+            const json = await res.json();
+            if (json[0]) {
+              results.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
             }
-            return null;
-          })
-        );
-        const filtered = resolved.filter(Boolean);
-        setCoords(filtered);
-      } else {
-        setCoords([]);
+          } catch {
+            // ignorieren, falls Adresse nicht gefunden
+          }
+        }
+        setCoords(results);
       }
     } catch (err) {
       console.error("Fehler:", err);
       setMsg("❌ Tour konnte nicht geladen werden");
     } finally {
-      setIsLoadingMap(false);
+      setLoading(false);
     }
   }
 
@@ -87,9 +93,9 @@ export default function Tagestour() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-[#0058A3]">Tagestour</h1>
 
-      {/* Tourauswahl */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Tour laden</h2>
+
         {msg && <div className="text-sm text-gray-600">{msg}</div>}
 
         <div className="flex flex-wrap gap-3 items-end">
@@ -142,9 +148,9 @@ export default function Tagestour() {
         )}
       </section>
 
-      {/* Stopps */}
       {tour && (
         <>
+          {/* Tabelle */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">
               Stopps dieser Tour
@@ -201,45 +207,48 @@ export default function Tagestour() {
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
 
-            {isLoadingMap && (
+            {loading && (
               <div className="text-gray-500 italic py-10 text-center">
                 Karte wird geladen …
               </div>
             )}
 
-            {!isLoadingMap && coords.length > 0 && (
-              <MapContainer
-                key={coords.length}
-                center={coords[0]}
-                zoom={11}
-                style={{
-                  height: "500px",
-                  width: "100%",
-                  borderRadius: "10px",
-                }}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                {coords.map((pos, i) => (
-                  <Marker key={i} position={pos} icon={icon}>
-                    <Popup>
-                      <div className="text-sm">
-                        <b>{stopps[i]?.kunde}</b>
-                        <br />
-                        {stopps[i]?.adresse}
-                        <br />
-                        Pos: {stopps[i]?.position || i + 1}
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-                <Polyline positions={coords} color="#0058A3" />
-              </MapContainer>
+            {!loading && coords.length > 0 && (
+              <div style={{ height: "500px", width: "100%" }}>
+                <MapContainer
+                  ref={mapRef}
+                  center={coords[0]}
+                  zoom={11}
+                  style={{
+                    height: "100%",
+                    width: "100%",
+                    borderRadius: "10px",
+                  }}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {coords.map((pos, i) => (
+                    <Marker key={i} position={pos} icon={icon}>
+                      <Popup>
+                        <div className="text-sm">
+                          <b>{stopps[i]?.kunde}</b>
+                          <br />
+                          {stopps[i]?.adresse}
+                          <br />
+                          Pos: {stopps[i]?.position || i + 1}
+                        </div>
+                      </Popup>
+                    </Marker>
+                  ))}
+                  <Polyline positions={coords} color="#0058A3" />
+                  <FitToMarkers coords={coords} />
+                </MapContainer>
+              </div>
             )}
 
-            {!isLoadingMap && coords.length === 0 && (
+            {!loading && coords.length === 0 && (
               <div className="text-gray-500 italic text-center py-10">
                 Keine Kartenkoordinaten gefunden.
               </div>
