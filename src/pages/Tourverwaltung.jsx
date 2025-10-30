@@ -24,11 +24,17 @@ export default function Tourverwaltung() {
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // Expanded: tour_id -> Stopps[]
-  const [stoppsMap, setStoppsMap] = useState({}); // { [tourId]: array }
-  // Edit-States
-  const [editTour, setEditTour] = useState({}); // { [tourId]: { fahrer_id, datum, bemerkung } }
-  const [editStopp, setEditStopp] = useState({}); // { [stoppId]: { ...fields } }
+  // Stopps einer Tour (auf-/zuklappen): tour_id -> Stopps[]
+  const [stoppsMap, setStoppsMap] = useState({}); // { [tourId]: Stopp[] }
+
+  // Tour-Edit: tour_id -> { fahrer_id, datum, bemerkung }
+  const [editTour, setEditTour] = useState({});
+
+  // Stopp-Edit: stopp_id -> bool (edit an/aus)
+  const [stoppEditing, setStoppEditing] = useState({}); // { [stoppId]: true|false }
+
+  // Stopp-Formdaten im Edit: stopp_id -> {felder}
+  const [stoppDraft, setStoppDraft] = useState({}); // { [stoppId]: { ... } }
 
   useEffect(() => {
     ladeFahrer();
@@ -39,7 +45,9 @@ export default function Tourverwaltung() {
     try {
       const data = await api.listFahrer();
       setFahrer(data);
-    } catch {}
+    } catch (e) {
+      console.error("Fahrer laden fehlgeschlagen:", e);
+    }
   }
 
   async function ladeTouren() {
@@ -83,31 +91,46 @@ export default function Tourverwaltung() {
         delete copy[tourId];
         return copy;
       });
+      // Edit-States der betroffenen Stopps entfernen
+      const toClear = new Set((stoppsMap[tourId] || []).map((s) => s.id));
+      setStoppEditing((e) => {
+        const c = { ...e };
+        for (const id of toClear) delete c[id];
+        return c;
+      });
+      setStoppDraft((d) => {
+        const c = { ...d };
+        for (const id of toClear) delete c[id];
+        return c;
+      });
       return;
     }
     // laden und ausklappen
     try {
       const s = await api.getStoppsByTour(tourId);
       setStoppsMap((m) => ({ ...m, [tourId]: s }));
-      // Edit-Stati vorbereiten
-      const st = {};
-      for (const item of s) {
-        st[item.id] = {
-          position: item.position ?? "",
-          kunde: item.kunde ?? "",
-          adresse: item.adresse ?? "",
-          telefon: item.telefon ?? "",
-          kommission: item.kommission ?? "",
-          hinweis: item.hinweis ?? "",
-        };
-      }
-      setEditStopp((prev) => ({ ...prev, ...st }));
+      // Drafts initialisieren (ohne in den Editmodus zu gehen)
+      setStoppDraft((prev) => {
+        const next = { ...prev };
+        for (const item of s) {
+          next[item.id] = {
+            position: item.position ?? "",
+            kunde: item.kunde ?? "",
+            adresse: item.adresse ?? "",
+            telefon: item.telefon ?? "",
+            kommission: item.kommission ?? "",
+            hinweis: item.hinweis ?? "",
+          };
+        }
+        return next;
+      });
     } catch (e) {
+      console.error(e);
       alert("Stopps konnten nicht geladen werden.");
     }
   }
 
-  // ---- Tour bearbeiten (inline oben)
+  // ---- Tour bearbeiten (inline)
   function startEditTour(t) {
     setEditTour((st) => ({
       ...st,
@@ -129,6 +152,7 @@ export default function Tourverwaltung() {
       await ladeTouren();
       cancelEditTour(tid);
     } catch (e) {
+      console.error(e);
       alert("Tour konnte nicht gespeichert werden.");
     }
   }
@@ -148,28 +172,67 @@ export default function Tourverwaltung() {
         delete c[tid];
         return c;
       });
-    } catch {
+    } catch (e) {
+      console.error(e);
       alert("Tour konnte nicht gelöscht werden.");
     }
   }
 
-  // ---- Stopp bearbeiten
-  function changeStoppField(stoppId, field, value) {
-    setEditStopp((st) => ({ ...st, [stoppId]: { ...st[stoppId], [field]: value } }));
+  // ---- Stopp Editmodus
+  function enterStoppEdit(stopp) {
+    setStoppEditing((e) => ({ ...e, [stopp.id]: true }));
+    setStoppDraft((d) => ({
+      ...d,
+      [stopp.id]: {
+        position: stopp.position ?? "",
+        kunde: stopp.kunde ?? "",
+        adresse: stopp.adresse ?? "",
+        telefon: stopp.telefon ?? "",
+        kommission: stopp.kommission ?? "",
+        hinweis: stopp.hinweis ?? "",
+      },
+    }));
   }
+
+  function cancelStoppEdit(stoppId) {
+    setStoppEditing((e) => {
+      const c = { ...e };
+      delete c[stoppId];
+      return c;
+    });
+    // Draft beibehalten (kein Schaden), oder zum Aufräumen löschen:
+    // setStoppDraft((d) => { const c = { ...d }; delete c[stoppId]; return c; });
+  }
+
+  function changeStoppDraft(stoppId, field, value) {
+    setStoppDraft((d) => ({ ...d, [stoppId]: { ...d[stoppId], [field]: value } }));
+  }
+
   async function saveStopp(stoppId, tourId) {
     try {
-      const payload = editStopp[stoppId];
+      const payload = stoppDraft[stoppId] || {};
+      // Typkonvertierung für position
+      if (payload.position === "") payload.position = null;
+      if (payload.position != null) payload.position = Number(payload.position);
+
       await api.updateStopp(stoppId, payload);
-      // lokale Liste aktualisieren
+
+      // Tabelle aktualisieren
       setStoppsMap((m) => ({
         ...m,
-        [tourId]: (m[tourId] || []).map((s) => (s.id === stoppId ? { ...s, ...payload } : s)),
+        [tourId]: (m[tourId] || []).map((s) =>
+          s.id === stoppId ? { ...s, ...payload } : s
+        ),
       }));
-    } catch {
+
+      // Editmodus schließen
+      cancelStoppEdit(stoppId);
+    } catch (e) {
+      console.error(e);
       alert("Stopp konnte nicht gespeichert werden.");
     }
   }
+
   async function deleteStopp(stoppId, tourId) {
     const ok = confirm("Diesen Stopp wirklich löschen?");
     if (!ok) return;
@@ -179,7 +242,19 @@ export default function Tourverwaltung() {
         ...m,
         [tourId]: (m[tourId] || []).filter((s) => s.id !== stoppId),
       }));
-    } catch {
+      // Editstate/Draft bereinigen
+      setStoppEditing((e) => {
+        const c = { ...e };
+        delete c[stoppId];
+        return c;
+      });
+      setStoppDraft((d) => {
+        const c = { ...d };
+        delete c[stoppId];
+        return c;
+      });
+    } catch (e) {
+      console.error(e);
       alert("Stopp konnte nicht gelöscht werden.");
     }
   }
@@ -408,74 +483,128 @@ export default function Tourverwaltung() {
                                     </tr>
                                   )}
                                   {stoppsMap[t.id].map((s) => {
-                                    const ed = editStopp[s.id] || {};
+                                    const isEditing = !!stoppEditing[s.id];
+                                    const draft = stoppDraft[s.id] || {};
                                     return (
                                       <tr key={s.id} className="hover:bg-white">
+                                        {/* Pos */}
                                         <td className="border px-2 py-1 w-16">
-                                          <input
-                                            type="number"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.position ?? ""}
-                                            onChange={(e) =>
-                                              changeStoppField(s.id, "position", e.target.value === "" ? null : Number(e.target.value))
-                                            }
-                                          />
+                                          {!isEditing ? (
+                                            s.position ?? ""
+                                          ) : (
+                                            <input
+                                              type="number"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.position ?? ""}
+                                              onChange={(e) =>
+                                                changeStoppDraft(
+                                                  s.id,
+                                                  "position",
+                                                  e.target.value === "" ? "" : Number(e.target.value)
+                                                )
+                                              }
+                                            />
+                                          )}
                                         </td>
+                                        {/* Kunde */}
                                         <td className="border px-2 py-1 w-56">
-                                          <input
-                                            type="text"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.kunde ?? ""}
-                                            onChange={(e) => changeStoppField(s.id, "kunde", e.target.value)}
-                                          />
+                                          {!isEditing ? (
+                                            s.kunde
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.kunde ?? ""}
+                                              onChange={(e) => changeStoppDraft(s.id, "kunde", e.target.value)}
+                                            />
+                                          )}
                                         </td>
+                                        {/* Adresse */}
                                         <td className="border px-2 py-1 w-72">
-                                          <input
-                                            type="text"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.adresse ?? ""}
-                                            onChange={(e) => changeStoppField(s.id, "adresse", e.target.value)}
-                                          />
+                                          {!isEditing ? (
+                                            s.adresse
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.adresse ?? ""}
+                                              onChange={(e) => changeStoppDraft(s.id, "adresse", e.target.value)}
+                                            />
+                                          )}
                                         </td>
+                                        {/* Telefon */}
                                         <td className="border px-2 py-1 w-48">
-                                          <input
-                                            type="text"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.telefon ?? ""}
-                                            onChange={(e) => changeStoppField(s.id, "telefon", e.target.value)}
-                                          />
+                                          {!isEditing ? (
+                                            s.telefon || <span className="text-gray-400">–</span>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.telefon ?? ""}
+                                              onChange={(e) => changeStoppDraft(s.id, "telefon", e.target.value)}
+                                            />
+                                          )}
                                         </td>
+                                        {/* Kommission */}
                                         <td className="border px-2 py-1 w-48">
-                                          <input
-                                            type="text"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.kommission ?? ""}
-                                            onChange={(e) => changeStoppField(s.id, "kommission", e.target.value)}
-                                          />
+                                          {!isEditing ? (
+                                            s.kommission || <span className="text-gray-400">–</span>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.kommission ?? ""}
+                                              onChange={(e) => changeStoppDraft(s.id, "kommission", e.target.value)}
+                                            />
+                                          )}
                                         </td>
+                                        {/* Hinweis */}
                                         <td className="border px-2 py-1 w-72">
-                                          <input
-                                            type="text"
-                                            className="border rounded px-2 py-1 w-full"
-                                            value={ed.hinweis ?? ""}
-                                            onChange={(e) => changeStoppField(s.id, "hinweis", e.target.value)}
-                                          />
+                                          {!isEditing ? (
+                                            s.hinweis || <span className="text-gray-400">–</span>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              className="border rounded px-2 py-1 w-full"
+                                              value={draft.hinweis ?? ""}
+                                              onChange={(e) => changeStoppDraft(s.id, "hinweis", e.target.value)}
+                                            />
+                                          )}
                                         </td>
+
+                                        {/* Aktionen */}
                                         <td className="border px-2 py-1">
-                                          <div className="flex gap-2">
-                                            <button
-                                              className="px-3 py-1 rounded bg-[#0058A3] text-white hover:bg-blue-800"
-                                              onClick={() => saveStopp(s.id, t.id)}
-                                            >
-                                              💾 Speichern
-                                            </button>
-                                            <button
-                                              className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600"
-                                              onClick={() => deleteStopp(s.id, t.id)}
-                                            >
-                                              🗑️ Löschen
-                                            </button>
-                                          </div>
+                                          {!isEditing ? (
+                                            <div className="flex gap-2">
+                                              <button
+                                                className="px-3 py-1 rounded bg-yellow-200 hover:bg-yellow-300"
+                                                onClick={() => enterStoppEdit(s)}
+                                              >
+                                                ✏️ Bearbeiten
+                                              </button>
+                                              <button
+                                                className="px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600"
+                                                onClick={() => deleteStopp(s.id, t.id)}
+                                              >
+                                                🗑️ Löschen
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <div className="flex gap-2">
+                                              <button
+                                                className="px-3 py-1 rounded bg-[#0058A3] text-white hover:bg-blue-800"
+                                                onClick={() => saveStopp(s.id, t.id)}
+                                              >
+                                                💾 Speichern
+                                              </button>
+                                              <button
+                                                className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300"
+                                                onClick={() => cancelStoppEdit(s.id)}
+                                              >
+                                                Abbrechen
+                                              </button>
+                                            </div>
+                                          )}
                                         </td>
                                       </tr>
                                     );
