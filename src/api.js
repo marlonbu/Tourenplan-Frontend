@@ -1,115 +1,111 @@
-// Zentrale API-Utility: sendet automatisch Authorization: Bearer <token>
-// Export: sowohl named Functions als auch Default-Objekt (max. Kompatibilität)
+// src/api.js
+// Zentraler API-Client: setzt automatisch Authorization: Bearer <token>
+// und kapselt alle Endpunkte. Exportiert `api` sowohl als named als auch als default.
 
 export const API_URL =
   import.meta.env.VITE_API_URL || "https://tourenplan.onrender.com";
 
 export const authHeader = () => {
-  const token = localStorage.getItem("token");
-  return {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  const token = localStorage.getItem("token") || "";
+  const headers = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
 };
 
-// ---------- Fahrer ----------
-export async function listFahrer() {
-  const res = await fetch(`${API_URL}/fahrer`, { headers: authHeader() });
-  if (!res.ok) throw new Error("Fehler beim Laden der Fahrer");
+async function handle(res, msg) {
+  if (!res.ok) {
+    // Versuche, eine brauchbare Fehlermeldung zu erzeugen
+    let detail = "";
+    try {
+      detail = await res.text();
+    } catch {
+      /* ignore */
+    }
+    throw new Error(detail ? `${msg}: ${detail}` : msg);
+  }
   return res.json();
 }
 
-export async function addFahrer(name) {
-  const res = await fetch(`${API_URL}/fahrer`, {
-    method: "POST",
-    headers: authHeader(),
-    body: JSON.stringify({ name }),
-  });
-  if (!res.ok) throw new Error("Fehler beim Hinzufügen des Fahrers");
-  return res.json();
-}
+export const api = {
+  // ---------- Fahrer ----------
+  async listFahrer() {
+    const res = await fetch(`${API_URL}/fahrer`, { headers: authHeader() });
+    return handle(res, "Fehler beim Laden der Fahrer");
+  },
 
-export async function deleteFahrer(id) {
-  const res = await fetch(`${API_URL}/fahrer/${id}`, {
-    method: "DELETE",
-    headers: authHeader(),
-  });
-  if (!res.ok) throw new Error("Fehler beim Löschen des Fahrers");
-  return res.json();
-}
+  async addFahrer(name) {
+    const res = await fetch(`${API_URL}/fahrer`, {
+      method: "POST",
+      headers: authHeader(),
+      body: JSON.stringify({ name }),
+    });
+    return handle(res, "Fehler beim Hinzufügen des Fahrers");
+  },
 
-// ---------- Touren ----------
-export async function createTour(fahrer_id, datum) {
-  const res = await fetch(`${API_URL}/touren`, {
-    method: "POST",
-    headers: authHeader(),
-    body: JSON.stringify({ fahrer_id, datum }),
-  });
-  if (!res.ok) throw new Error("Fehler beim Anlegen der Tour");
-  return res.json();
-}
+  async deleteFahrer(id) {
+    const res = await fetch(`${API_URL}/fahrer/${id}`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
+    return handle(res, "Fehler beim Löschen des Fahrers");
+  },
 
-export async function getTour(fahrer_id, datum) {
-  const res = await fetch(`${API_URL}/touren/${fahrer_id}/${datum}`, {
-    headers: authHeader(),
-  });
-  if (!res.ok) throw new Error("Fehler beim Laden der Tour");
-  return res.json();
-}
+  // ---------- Touren ----------
+  async createTour(fahrer_id, datum) {
+    const res = await fetch(`${API_URL}/touren`, {
+      method: "POST",
+      headers: authHeader(),
+      body: JSON.stringify({ fahrer_id, datum }),
+    });
+    return handle(res, "Fehler beim Anlegen der Tour");
+  },
 
-// ---------- Stopps ----------
-export async function createStopp(tour_id, stopp) {
-  const res = await fetch(`${API_URL}/stopps/${tour_id}`, {
-    method: "POST",
-    headers: authHeader(),
-    body: JSON.stringify(stopp),
-  });
-  if (!res.ok) throw new Error("Fehler beim Hinzufügen des Stopps");
-  return res.json();
-}
+  async getTour(fahrer_id, datum) {
+    const res = await fetch(`${API_URL}/touren/${fahrer_id}/${datum}`, {
+      headers: authHeader(),
+    });
+    return handle(res, "Fehler beim Laden der Tour");
+  },
 
-export async function deleteStopp(id) {
-  const res = await fetch(`${API_URL}/stopps/${id}`, {
-    method: "DELETE",
-    headers: authHeader(),
-  });
-  if (!res.ok) throw new Error("Fehler beim Löschen des Stopps");
-  return res.json();
-}
+  // ---------- Stopps ----------
+  async createStopp(tour_id, stopp) {
+    const res = await fetch(`${API_URL}/stopps/${tour_id}`, {
+      method: "POST",
+      headers: authHeader(),
+      body: JSON.stringify(stopp),
+    });
+    return handle(res, "Fehler beim Hinzufügen des Stopps");
+  },
 
-// ---------- Fotos ----------
-export async function uploadStoppFoto(stopp_id, file) {
-  const form = new FormData();
-  form.append("foto", file);
-  const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
-    method: "POST",
-    headers: { Authorization: authHeader().Authorization }, // kein Content-Type setzen!
-    body: form,
-  });
-  if (!res.ok) throw new Error("Fehler beim Foto-Upload");
-  return res.json();
-}
+  async deleteStopp(id) {
+    const res = await fetch(`${API_URL}/stopps/${id}`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
+    return handle(res, "Fehler beim Löschen des Stopps");
+  },
 
-export async function deleteStoppFoto(stopp_id) {
-  const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
-    method: "DELETE",
-    headers: { Authorization: authHeader().Authorization },
-  });
-  if (!res.ok) throw new Error("Fehler beim Foto-Löschen");
-  return res.json();
-}
+  // ---------- Foto Upload/Löschen ----------
+  async uploadStoppFoto(stopp_id, file) {
+    const form = new FormData();
+    form.append("foto", file);
+    const token = localStorage.getItem("token") || "";
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined, // kein Content-Type für FormData!
+      body: form,
+    });
+    return handle(res, "Fehler beim Foto-Upload");
+  },
 
-// Default-Objekt (falls die Seite `import api from './api'` nutzt)
-const api = {
-  listFahrer,
-  addFahrer,
-  deleteFahrer,
-  createTour,
-  getTour,
-  createStopp,
-  deleteStopp,
-  uploadStoppFoto,
-  deleteStoppFoto,
+  async deleteStoppFoto(stopp_id) {
+    const token = localStorage.getItem("token") || "";
+    const res = await fetch(`${API_URL}/stopps/${stopp_id}/foto`, {
+      method: "DELETE",
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    });
+    return handle(res, "Fehler beim Foto-Löschen");
+  },
 };
 
-export default api;
+export default api; // Default-Export
