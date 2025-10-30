@@ -9,7 +9,7 @@ function makeAuthHeader() {
   if (token && token.startsWith("eyJ")) {
     headers.Authorization = `Bearer ${token}`;
   } else if (token) {
-    headers.Authorization = token; // Legacy
+    headers.Authorization = token; // Legacy-Fall (normalerweise nicht genutzt)
   }
   return headers;
 }
@@ -17,9 +17,7 @@ function makeAuthHeader() {
 async function handle(res, msg) {
   if (!res.ok) {
     let detail = "";
-    try {
-      detail = await res.text();
-    } catch {}
+    try { detail = await res.text(); } catch {}
     throw new Error(detail ? `${msg}: ${detail}` : msg);
   }
   return res.json();
@@ -27,23 +25,17 @@ async function handle(res, msg) {
 
 // ---------- API ----------
 export const api = {
-  // ---------- Login ----------
+  // ---------- Login (speichert Token) ----------
   async login(username, password) {
     const res = await fetch(`${API_URL}/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-
     if (!res.ok) throw new Error("Login fehlgeschlagen");
-
     const data = await res.json();
-
     if (!data.token) throw new Error("Kein Token erhalten");
-
-    // ✅ Token im localStorage speichern
-    localStorage.setItem("token", data.token);
-
+    localStorage.setItem("token", data.token); // ✅ Token persistieren
     return data;
   },
 
@@ -162,9 +154,7 @@ export const api = {
     if (date_to) params.set("date_to", date_to);
     if (kw) params.set("kw", kw);
     if (kunde) params.set("kunde", kunde);
-    const url = `${API_URL}/touren-admin${
-      params.toString() ? `?${params.toString()}` : ""
-    }`;
+    const url = `${API_URL}/touren-admin${params.toString() ? `?${params.toString()}` : ""}`;
     const res = await fetch(url, { headers: makeAuthHeader() });
     return handle(res, "Fehler beim Laden der Touren");
   },
