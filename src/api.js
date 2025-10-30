@@ -12,7 +12,7 @@ function makeAuthHeader() {
   if (token.startsWith("eyJ")) {
     headers.Authorization = `Bearer ${token}`;
   } else {
-    headers.Authorization = token; // Legacy
+    headers.Authorization = token; // Legacy (falls noch aktiv)
   }
   return headers;
 }
@@ -167,6 +167,21 @@ export const api = {
     });
     return handle(res, "Fehler beim Aktualisieren des Stopps");
   },
+};
+
+// ---------- Login (Token speichern) ----------
+api.login = async function (username, password) {
+  const res = await fetch(`${API_URL}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!res.ok) throw new Error("Login fehlgeschlagen");
+  const data = await res.json();
+  if (!data.token) throw new Error("Kein Token erhalten");
+  // ✅ Token wirklich speichern
+  localStorage.setItem("token", data.token);
+  return data;
 };
 
 export default api;
