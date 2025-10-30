@@ -1,6 +1,13 @@
 import React, { useEffect, useState, useRef } from "react";
 import { api } from "../api";
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 
 const icon = L.icon({
@@ -15,7 +22,7 @@ function FitToMarkers({ coords }) {
   useEffect(() => {
     if (coords.length > 0) {
       const bounds = L.latLngBounds(coords);
-      map.fitBounds(bounds, { padding: [40, 40] });
+      map.flyToBounds(bounds, { padding: [50, 50] });
     }
   }, [coords]);
   return null;
@@ -30,7 +37,8 @@ export default function Tagestour() {
   const [coords, setCoords] = useState([]);
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
-  const mapRef = useRef();
+  const [mapReady, setMapReady] = useState(false);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     ladeFahrer();
@@ -54,7 +62,6 @@ export default function Tagestour() {
 
     setLoading(true);
     setCoords([]);
-
     try {
       const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
@@ -62,7 +69,7 @@ export default function Tagestour() {
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
 
       if (data.stopps?.length > 0) {
-        const results = [];
+        const coordsNeu = [];
         for (const s of data.stopps) {
           if (!s.adresse) continue;
           try {
@@ -73,13 +80,11 @@ export default function Tagestour() {
             );
             const json = await res.json();
             if (json[0]) {
-              results.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
+              coordsNeu.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
             }
-          } catch {
-            // ignorieren, falls Adresse nicht gefunden
-          }
+          } catch {}
         }
-        setCoords(results);
+        setCoords(coordsNeu);
       }
     } catch (err) {
       console.error("Fehler:", err);
@@ -93,9 +98,9 @@ export default function Tagestour() {
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold text-[#0058A3]">Tagestour</h1>
 
+      {/* Auswahl */}
       <section className="bg-white p-4 rounded-lg shadow space-y-3">
         <h2 className="text-lg font-medium text-[#0058A3]">Tour laden</h2>
-
         {msg && <div className="text-sm text-gray-600">{msg}</div>}
 
         <div className="flex flex-wrap gap-3 items-end">
@@ -148,9 +153,9 @@ export default function Tagestour() {
         )}
       </section>
 
+      {/* Stopps */}
       {tour && (
         <>
-          {/* Tabelle */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">
               Stopps dieser Tour
@@ -178,9 +183,11 @@ export default function Tagestour() {
                     </td>
                   </tr>
                 )}
-                {stopps.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="border px-2 py-1 text-center">{s.position}</td>
+                {stopps.map((s, i) => (
+                  <tr key={s.id || i} className="hover:bg-gray-50">
+                    <td className="border px-2 py-1 text-center">
+                      {s.position}
+                    </td>
                     <td className="border px-2 py-1">{s.kunde}</td>
                     <td className="border px-2 py-1">
                       <a
@@ -208,17 +215,17 @@ export default function Tagestour() {
             <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
 
             {loading && (
-              <div className="text-gray-500 italic py-10 text-center">
+              <div className="text-gray-500 italic text-center py-10">
                 Karte wird geladen …
               </div>
             )}
 
-            {!loading && coords.length > 0 && (
+            {!loading && (
               <div style={{ height: "500px", width: "100%" }}>
                 <MapContainer
-                  ref={mapRef}
-                  center={coords[0]}
-                  zoom={11}
+                  center={[52.9, 8.0]} // Startmittelpunkt Norddeutschland
+                  zoom={8}
+                  whenCreated={() => setMapReady(true)}
                   style={{
                     height: "100%",
                     width: "100%",
@@ -229,28 +236,27 @@ export default function Tagestour() {
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {coords.map((pos, i) => (
-                    <Marker key={i} position={pos} icon={icon}>
-                      <Popup>
-                        <div className="text-sm">
-                          <b>{stopps[i]?.kunde}</b>
-                          <br />
-                          {stopps[i]?.adresse}
-                          <br />
-                          Pos: {stopps[i]?.position || i + 1}
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                  <Polyline positions={coords} color="#0058A3" />
-                  <FitToMarkers coords={coords} />
+                  {mapReady &&
+                    coords.map((pos, i) => (
+                      <Marker key={i} position={pos} icon={icon}>
+                        <Popup>
+                          <div className="text-sm">
+                            <b>{stopps[i]?.kunde}</b>
+                            <br />
+                            {stopps[i]?.adresse}
+                            <br />
+                            Pos: {stopps[i]?.position || i + 1}
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                  {coords.length > 1 && (
+                    <>
+                      <Polyline positions={coords} color="#0058A3" />
+                      <FitToMarkers coords={coords} />
+                    </>
+                  )}
                 </MapContainer>
-              </div>
-            )}
-
-            {!loading && coords.length === 0 && (
-              <div className="text-gray-500 italic text-center py-10">
-                Keine Kartenkoordinaten gefunden.
               </div>
             )}
           </section>
