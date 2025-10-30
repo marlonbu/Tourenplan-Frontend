@@ -123,7 +123,7 @@ export const api = {
     return handle(res, "Fehler beim Foto-Löschen");
   },
 
-  // ---------- NEU: Fahrer-Anmerkung ----------
+  // ---------- Fahrer-Anmerkung ----------
   async updateStoppAnmerkung(id, anmerkung_fahrer) {
     const res = await fetch(`${API_URL}/stopps/${id}/anmerkung`, {
       method: "PATCH",
@@ -131,6 +131,19 @@ export const api = {
       body: JSON.stringify({ anmerkung_fahrer }),
     });
     return handle(res, "Fehler beim Speichern der Anmerkung");
+  },
+
+  // ---------- NEU: Gesamt-/Wochenübersicht ----------
+  async getUebersicht({ fahrer_id, datum, kw, kunde } = {}) {
+    const params = new URLSearchParams();
+    if (fahrer_id) params.set("fahrer_id", fahrer_id);
+    if (datum) params.set("datum", datum);
+    if (kw) params.set("kw", kw); // Format: YYYY-Www (z. B. 2025-W44)
+    if (kunde) params.set("kunde", kunde);
+
+    const url = `${API_URL}/touren-uebersicht${params.toString() ? `?${params.toString()}` : ""}`;
+    const res = await fetch(url, { headers: makeAuthHeader() });
+    return handle(res, "Fehler beim Laden der Übersicht");
   },
 };
 
