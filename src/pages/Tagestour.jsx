@@ -10,24 +10,95 @@ import {
 } from "react-leaflet";
 import L from "leaflet";
 
-// Leaflet-Icon (Standard)
-const icon = L.icon({
+// ---------- Icons ----------
+const defaultIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
 });
 
-// Hilfskomponente zum automatischen Zoomen auf Marker
-function FitToMarkers({ coords }) {
+const startDivIcon = L.divIcon({
+  className: "start-marker",
+  html: `<div style="
+    font-size:24px;
+    line-height:24px;
+    transform: translate(-12px, -12px);
+  ">🏭</div>`,
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+});
+
+// ---------- Hilfskomponenten ----------
+function FitToBounds({ lineCoords }) {
   const map = useMap();
   useEffect(() => {
-    if (coords.length > 0) {
-      const bounds = L.latLngBounds(coords);
+    if (lineCoords && lineCoords.length > 0) {
+      const bounds = L.latLngBounds(lineCoords.map(([lat, lon]) => L.latLng(lat, lon)));
       map.fitBounds(bounds, { padding: [50, 50] });
     }
-  }, [coords, map]);
+  }, [lineCoords, map]);
   return null;
+}
+
+// ---------- Utils ----------
+const START_ADRESSE = "Hans Gehlenborg GmbH, Fehnstraße 3, 49699 Lindern";
+
+async function geocodeAdresse(addr) {
+  if (!addr) return null;
+  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+    addr
+  )}`;
+  const res = await fetch(url);
+  const json = await res.json();
+  if (json && json[0]) {
+    return [parseFloat(json[0].lat), parseFloat(json[0].lon)]; // [lat, lon]
+  }
+  return null;
+}
+
+function telHref(raw) {
+  if (!raw) return "";
+  // Entfernt Leerzeichen, Klammern, Bindestriche, Slashes
+  const cleaned = raw.replace(/[()\s\-\/]/g, "");
+  return `tel:${cleaned}`;
+}
+
+// Baut eine Google-Maps-URL mit allen Stopps (origin = Start, destination = letzter Stopp, waypoints = Rest)
+function buildGoogleMapsRouteURL(startAdresse, stopps) {
+  const addrs = (stopps || [])
+    .map((s) => s?.adresse)
+    .filter(Boolean);
+
+  if (addrs.length === 0) {
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(startAdresse)}`;
+  }
+
+  const origin = encodeURIComponent(startAdresse);
+  const destination = encodeURIComponent(addrs[addrs.length - 1]);
+  const waypoints =
+    addrs.length > 1
+      ? `&waypoints=${encodeURIComponent(addrs.slice(0, -1).join("|"))}`
+      : "";
+
+  return `https://www.google.com/maps/dir/?api=1&travelmode=driving&origin=${origin}&destination=${destination}${waypoints}`;
+}
+
+// Fragt eine Straßenroute bei OSRM ab (driving), erwartet coords: [[lat, lon], ...]
+async function fetchOsrmRoute(coords) {
+  if (!coords || coords.length < 2) return null;
+  // OSRM erwartet lon,lat;lon,lat;...
+  const path = coords
+    .map(([lat, lon]) => `${lon},${lat}`)
+    .join(";");
+
+  const url = `https://router.project-osrm.org/route/v1/driving/${path}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  const line =
+    data?.routes?.[0]?.geometry?.coordinates?.map(([lon, lat]) => [lat, lon]) || [];
+  return line.length ? line : null;
 }
 
 export default function Tagestour() {
@@ -36,13 +107,14 @@ export default function Tagestour() {
   const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
-  const [coords, setCoords] = useState([]);
+  const [coords, setCoords] = useState([]); // nur Marker-Koordinaten (Start + Stopps)
+  const [routeCoords, setRouteCoords] = useState([]); // OSRM-Routenlinie
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Status je Stopp-ID für Auto-Save: "idle" | "saving" | "saved" | "error"
-  const [saveState, setSaveState] = useState({}); // { [id]: "saving" | ... }
-  const timersRef = useRef({}); // { [id]: timeoutId }
+  // Autosave-Status für "Anmerkung Fahrer"
+  const [saveState, setSaveState] = useState({}); // { [id]: "saving"|"saved"|"error"|"idle" }
+  const timersRef = useRef({}); // Debounce Timer je Stopp-ID
 
   useEffect(() => {
     ladeFahrer();
@@ -66,7 +138,9 @@ export default function Tagestour() {
 
     setLoading(true);
     setCoords([]);
+    setRouteCoords([]);
     setSaveState({});
+
     try {
       const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
@@ -74,26 +148,38 @@ export default function Tagestour() {
       setStopps(s);
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
 
-      // Geokodierung
-      if (s.length > 0) {
-        const coordsNeu = [];
-        for (const st of s) {
-          if (!st.adresse) continue;
-          try {
-            const res = await fetch(
-              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                st.adresse
-              )}`
-            );
-            const json = await res.json();
-            if (json[0]) {
-              coordsNeu.push([parseFloat(json[0].lat), parseFloat(json[0].lon)]);
-            }
-          } catch {
-            // ignorieren
-          }
+      // --- Geokodierung: Start + Stopps (in Reihenfolge Start -> Stopp1 -> Stopp2 ...)
+      const startCoord = await geocodeAdresse(START_ADRESSE);
+      const stoppCoords = [];
+
+      for (const st of s) {
+        if (!st?.adresse) {
+          stoppCoords.push(null);
+          continue;
         }
-        setCoords(coordsNeu);
+        try {
+          const c = await geocodeAdresse(st.adresse);
+          stoppCoords.push(c);
+        } catch {
+          stoppCoords.push(null);
+        }
+      }
+
+      const markerCoords = [startCoord, ...stoppCoords].filter(Boolean);
+      setCoords(markerCoords);
+
+      // --- OSRM Route holen (wenn mind. Start + 1 Ziel)
+      const routeInput = [startCoord, ...stoppCoords].filter(Boolean);
+      if (routeInput.length >= 2) {
+        const route = await fetchOsrmRoute(routeInput);
+        if (route && route.length) {
+          setRouteCoords(route);
+        } else {
+          // Fallback: einfache Linie (falls OSRM down)
+          setRouteCoords(routeInput);
+        }
+      } else {
+        setRouteCoords([]);
       }
     } catch (err) {
       console.error("Fehler:", err);
@@ -103,32 +189,18 @@ export default function Tagestour() {
     }
   }
 
-  // Eingabe-Handler für "Anmerkung Fahrer"
+  // Eingabe-Handler für "Anmerkung Fahrer" (Autosave)
   function handleAnmerkungChange(id, value) {
-    // UI sofort updaten
-    setStopps((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, anmerkung_fahrer: value } : s))
-    );
+    setStopps((prev) => prev.map((s) => (s.id === id ? { ...s, anmerkung_fahrer: value } : s)));
 
-    // evtl. laufenden Timer abbrechen
-    if (timersRef.current[id]) {
-      clearTimeout(timersRef.current[id]);
-    }
-
-    // "saving" anzeigen
+    if (timersRef.current[id]) clearTimeout(timersRef.current[id]);
     setSaveState((st) => ({ ...st, [id]: "saving" }));
 
-    // Debounce: nach 1s ohne Tipp speichern
-    timersRef.current[id] = setTimeout(() => {
-      saveAnmerkung(id, value);
-    }, 1000);
+    timersRef.current[id] = setTimeout(() => saveAnmerkung(id, value), 1000);
   }
 
-  // Sofort speichern bei Blur (Feld verlassen)
   function handleAnmerkungBlur(id, value) {
-    if (timersRef.current[id]) {
-      clearTimeout(timersRef.current[id]);
-    }
+    if (timersRef.current[id]) clearTimeout(timersRef.current[id]);
     saveAnmerkung(id, value);
   }
 
@@ -136,15 +208,15 @@ export default function Tagestour() {
     try {
       await api.updateStoppAnmerkung(id, value);
       setSaveState((st) => ({ ...st, [id]: "saved" }));
-      // „saved“ Meldung nach kurzer Zeit wieder ausblenden
-      setTimeout(() => {
-        setSaveState((st) => ({ ...st, [id]: "idle" }));
-      }, 1500);
+      setTimeout(() => setSaveState((st) => ({ ...st, [id]: "idle" })), 1500);
     } catch (err) {
       console.error("Anmerkung speichern fehlgeschlagen:", err);
       setSaveState((st) => ({ ...st, [id]: "error" }));
     }
   }
+
+  // Google-Maps Button URL
+  const gmapsUrl = buildGoogleMapsRouteURL(START_ADRESSE, stopps);
 
   return (
     <div className="space-y-6">
@@ -209,9 +281,7 @@ export default function Tagestour() {
       {tour && (
         <>
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
-            <h2 className="text-lg font-medium text-[#0058A3]">
-              Stopps dieser Tour
-            </h2>
+            <h2 className="text-lg font-medium text-[#0058A3]">Stopps dieser Tour</h2>
 
             <table className="min-w-full border text-sm">
               <thead className="bg-[#0058A3] text-white">
@@ -228,19 +298,14 @@ export default function Tagestour() {
               <tbody>
                 {stopps.length === 0 && (
                   <tr>
-                    <td
-                      colSpan="7"
-                      className="text-center py-2 text-gray-500 italic"
-                    >
+                    <td colSpan="7" className="text-center py-2 text-gray-500 italic">
                       Keine Stopps vorhanden
                     </td>
                   </tr>
                 )}
                 {stopps.map((s, i) => (
                   <tr key={s.id || i} className="hover:bg-gray-50 align-top">
-                    <td className="border px-2 py-1 text-center">
-                      {s.position}
-                    </td>
+                    <td className="border px-2 py-1 text-center">{s.position}</td>
                     <td className="border px-2 py-1">{s.kunde}</td>
                     <td className="border px-2 py-1">
                       <a
@@ -254,7 +319,15 @@ export default function Tagestour() {
                         {s.adresse}
                       </a>
                     </td>
-                    <td className="border px-2 py-1">{s.telefon}</td>
+                    <td className="border px-2 py-1">
+                      {s.telefon ? (
+                        <a href={telHref(s.telefon)} className="text-blue-600 hover:underline">
+                          {s.telefon}
+                        </a>
+                      ) : (
+                        ""
+                      )}
+                    </td>
                     <td className="border px-2 py-1">{s.kommission}</td>
                     <td className="border px-2 py-1">{s.hinweis}</td>
                     <td className="border px-2 py-1 w-[260px]">
@@ -262,12 +335,8 @@ export default function Tagestour() {
                         className="border rounded-md px-2 py-1 w-full resize-y min-h-[34px]"
                         placeholder='z. B. "ok" oder Problem notieren'
                         value={s.anmerkung_fahrer || ""}
-                        onChange={(e) =>
-                          handleAnmerkungChange(s.id, e.target.value)
-                        }
-                        onBlur={(e) =>
-                          handleAnmerkungBlur(s.id, e.target.value)
-                        }
+                        onChange={(e) => handleAnmerkungChange(s.id, e.target.value)}
+                        onBlur={(e) => handleAnmerkungBlur(s.id, e.target.value)}
                       />
                       <div className="text-xs mt-1 h-4">
                         {saveState[s.id] === "saving" && (
@@ -287,6 +356,18 @@ export default function Tagestour() {
             </table>
           </section>
 
+          {/* Google Maps Button */}
+          <div className="w-full flex items-center justify-center">
+            <a
+              href={gmapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block bg-[#0058A3] text-white px-5 py-2 rounded-md shadow hover:bg-blue-800"
+            >
+              Tour in Google Maps öffnen
+            </a>
+          </div>
+
           {/* Karte */}
           <section className="bg-white p-4 rounded-lg shadow space-y-4">
             <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
@@ -296,18 +377,31 @@ export default function Tagestour() {
                 Karte wird geladen …
               </div>
             ) : (
-              <div style={{ height: "500px", width: "100%" }}>
+              <div style={{ height: "520px", width: "100%" }}>
                 <MapContainer
                   center={[52.9, 8.0]}
-                  zoom={8}
+                  zoom={9}
                   style={{ height: "100%", width: "100%", borderRadius: "10px" }}
                 >
                   <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                     url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                  {coords.map((pos, i) => (
-                    <Marker key={i} position={pos} icon={icon}>
+
+                  {/* Startpunkt */}
+                  {coords[0] && (
+                    <Marker position={coords[0]} icon={startDivIcon}>
+                      <Popup>
+                        <b>Start</b>
+                        <br />
+                        {START_ADRESSE}
+                      </Popup>
+                    </Marker>
+                  )}
+
+                  {/* Stopps (Marker ab Index 1) */}
+                  {coords.slice(1).map((pos, i) => (
+                    <Marker key={i} position={pos} icon={defaultIcon}>
                       <Popup>
                         <div className="text-sm">
                           <b>{stopps[i]?.kunde}</b>
@@ -325,10 +419,12 @@ export default function Tagestour() {
                       </Popup>
                     </Marker>
                   ))}
-                  {coords.length > 1 && (
+
+                  {/* Route (OSRM) */}
+                  {routeCoords.length > 0 && (
                     <>
-                      <Polyline positions={coords} color="#0058A3" />
-                      <FitToMarkers coords={coords} />
+                      <Polyline positions={routeCoords} />
+                      <FitToBounds lineCoords={routeCoords} />
                     </>
                   )}
                 </MapContainer>
