@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { api } from "../api";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import L from "leaflet";
+
+const icon = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+});
 
 export default function Tagestour() {
   const [fahrer, setFahrer] = useState([]);
@@ -8,6 +17,7 @@ export default function Tagestour() {
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
   const [msg, setMsg] = useState("");
+  const [coords, setCoords] = useState([]); // GPS-Koordinaten der Stopps
 
   useEffect(() => {
     ladeFahrer();
@@ -33,6 +43,29 @@ export default function Tagestour() {
       setTour(data.tour);
       setStopps(data.stopps || []);
       setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour gefunden");
+
+      if (data.stopps?.length > 0) {
+        // Koordinaten ermitteln
+        const resolved = await Promise.all(
+          data.stopps.map(async (s) => {
+            try {
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+                  s.adresse || ""
+                )}`
+              );
+              const json = await res.json();
+              if (json[0]) return [parseFloat(json[0].lat), parseFloat(json[0].lon)];
+            } catch {
+              return null;
+            }
+            return null;
+          })
+        );
+        setCoords(resolved.filter(Boolean));
+      } else {
+        setCoords([]);
+      }
     } catch (err) {
       console.error("Fehler:", err);
       setMsg("❌ Tour konnte nicht geladen werden");
@@ -99,57 +132,91 @@ export default function Tagestour() {
       </section>
 
       {tour && (
-        <section className="bg-white p-4 rounded-lg shadow space-y-4">
-          <h2 className="text-lg font-medium text-[#0058A3]">
-            Stopps dieser Tour
-          </h2>
+        <>
+          {/* Tabelle */}
+          <section className="bg-white p-4 rounded-lg shadow space-y-4">
+            <h2 className="text-lg font-medium text-[#0058A3]">
+              Stopps dieser Tour
+            </h2>
 
-          <table className="min-w-full border text-sm">
-            <thead className="bg-[#0058A3] text-white">
-              <tr>
-                <th className="border px-2 py-1">Pos</th>
-                <th className="border px-2 py-1">Kunde</th>
-                <th className="border px-2 py-1">Adresse</th>
-                <th className="border px-2 py-1">Telefon</th>
-                <th className="border px-2 py-1">Kommission</th>
-                <th className="border px-2 py-1">Hinweis</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stopps.length === 0 && (
+            <table className="min-w-full border text-sm">
+              <thead className="bg-[#0058A3] text-white">
                 <tr>
-                  <td
-                    colSpan="6"
-                    className="text-center py-2 text-gray-500 italic"
-                  >
-                    Keine Stopps vorhanden
-                  </td>
+                  <th className="border px-2 py-1">Pos</th>
+                  <th className="border px-2 py-1">Kunde</th>
+                  <th className="border px-2 py-1">Adresse</th>
+                  <th className="border px-2 py-1">Telefon</th>
+                  <th className="border px-2 py-1">Kommission</th>
+                  <th className="border px-2 py-1">Hinweis</th>
                 </tr>
-              )}
-              {stopps.map((s) => (
-                <tr key={s.id} className="hover:bg-gray-50">
-                  <td className="border px-2 py-1 text-center">{s.position}</td>
-                  <td className="border px-2 py-1">{s.kunde}</td>
-                  <td className="border px-2 py-1">
-                    <a
-                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                        s.adresse || ""
-                      )}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
+              </thead>
+              <tbody>
+                {stopps.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan="6"
+                      className="text-center py-2 text-gray-500 italic"
                     >
-                      {s.adresse}
-                    </a>
-                  </td>
-                  <td className="border px-2 py-1">{s.telefon}</td>
-                  <td className="border px-2 py-1">{s.kommission}</td>
-                  <td className="border px-2 py-1">{s.hinweis}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+                      Keine Stopps vorhanden
+                    </td>
+                  </tr>
+                )}
+                {stopps.map((s) => (
+                  <tr key={s.id} className="hover:bg-gray-50">
+                    <td className="border px-2 py-1 text-center">{s.position}</td>
+                    <td className="border px-2 py-1">{s.kunde}</td>
+                    <td className="border px-2 py-1">
+                      <a
+                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                          s.adresse || ""
+                        )}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        {s.adresse}
+                      </a>
+                    </td>
+                    <td className="border px-2 py-1">{s.telefon}</td>
+                    <td className="border px-2 py-1">{s.kommission}</td>
+                    <td className="border px-2 py-1">{s.hinweis}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+
+          {/* Karte */}
+          {coords.length > 0 && (
+            <section className="bg-white p-4 rounded-lg shadow space-y-4">
+              <h2 className="text-lg font-medium text-[#0058A3]">Karte</h2>
+              <MapContainer
+                center={coords[0]}
+                zoom={11}
+                style={{ height: "400px", width: "100%", borderRadius: "10px" }}
+              >
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                {coords.map((pos, i) => (
+                  <Marker key={i} position={pos} icon={icon}>
+                    <Popup>
+                      <div className="text-sm">
+                        <b>{stopps[i]?.kunde}</b>
+                        <br />
+                        {stopps[i]?.adresse}
+                        <br />
+                        Pos: {stopps[i]?.position || i + 1}
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+                <Polyline positions={coords} color="#0058A3" />
+              </MapContainer>
+            </section>
+          )}
+        </>
       )}
     </div>
   );
