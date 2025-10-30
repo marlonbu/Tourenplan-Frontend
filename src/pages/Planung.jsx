@@ -1,329 +1,342 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "../api";
 
-// 🔍 Fehlerüberwachung (zeigt JavaScript-Fehler in der Render-Konsole)
-window.addEventListener("error", (e) => {
-  console.error("❌ Uncaught Error:", e.message, e.filename, e.lineno);
-});
-
-const fmtISO = (d = new Date()) => {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-};
-
 export default function Planung() {
-  // 🧪 Testanzeige: API geladen?
-  if (!api)
-    return (
-      <div className="p-6 text-red-600 font-semibold">
-        ❌ API nicht geladen – überprüfe src/api.js Import oder Pfad.
-      </div>
-    );
-
-  // Fahrer
   const [fahrer, setFahrer] = useState([]);
-  const [fahrerId, setFahrerId] = useState("");
-  const [neuerFahrer, setNeuerFahrer] = useState("");
-
-  // Tour
-  const [datum, setDatum] = useState(fmtISO());
+  const [selectedFahrer, setSelectedFahrer] = useState("");
+  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [tour, setTour] = useState(null);
   const [stopps, setStopps] = useState([]);
 
-  // UI
-  const [msg, setMsg] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  // Formular: neuer Stopp
-  const [neu, setNeu] = useState({
+  // Felder für neuen Stopp
+  const [neuStopp, setNeuStopp] = useState({
     kunde: "",
     adresse: "",
     telefon: "",
     kommission: "",
     hinweis: "",
-    position: 0,
+    position: "",
   });
 
-  // Fahrer laden
-  const loadFahrer = () => {
-    api
-      .listFahrer()
-      .then(setFahrer)
-      .catch(() => setMsg("❌ Fehler beim Laden der Fahrer"));
-  };
+  const [msg, setMsg] = useState("");
 
   useEffect(() => {
-    loadFahrer();
+    ladeFahrer();
   }, []);
 
-  const fahrerName = useMemo(
-    () => fahrer.find((f) => String(f.id) === String(fahrerId))?.name || "",
-    [fahrer, fahrerId]
-  );
-
-  // Fahrer hinzufügen
-  const addFahrer = async () => {
-    setMsg("");
-    if (!neuerFahrer.trim()) {
-      setMsg("⚠️ Bitte Namen eingeben");
-      return;
-    }
+  async function ladeFahrer() {
     try {
-      await api.addFahrer(neuerFahrer.trim());
-      setNeuerFahrer("");
-      setMsg("✅ Fahrer hinzugefügt");
-      loadFahrer();
-    } catch {
-      setMsg("❌ Fehler beim Hinzufügen des Fahrers");
+      const data = await api.listFahrer();
+      setFahrer(data);
+    } catch (err) {
+      console.error("Fehler beim Laden der Fahrer:", err);
+      setMsg("❌ Fehler beim Laden der Fahrer");
     }
-  };
+  }
 
-  // Fahrer löschen
-  const deleteFahrer = async (id) => {
+  async function addFahrer() {
+    const name = prompt("Name des neuen Fahrers:");
+    if (!name) return;
+    try {
+      await api.addFahrer(name);
+      ladeFahrer();
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Fahrer konnte nicht hinzugefügt werden");
+    }
+  }
+
+  async function deleteFahrer(id) {
     if (!window.confirm("Fahrer wirklich löschen?")) return;
     try {
       await api.deleteFahrer(id);
-      setMsg("🗑️ Fahrer gelöscht");
-      if (String(id) === String(fahrerId)) {
-        setFahrerId("");
-        setTour(null);
-        setStopps([]);
-      }
-      loadFahrer();
-    } catch {
-      setMsg("❌ Fehler beim Löschen des Fahrers");
+      ladeFahrer();
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Fahrer konnte nicht gelöscht werden");
     }
-  };
+  }
 
-  // Tour anlegen
-  const createTour = async () => {
-    setMsg("");
-    if (!fahrerId || !datum) {
-      setMsg("⚠️ Fahrer & Datum wählen");
+  async function anlegenTour() {
+    if (!selectedFahrer || !datum) {
+      alert("Bitte Fahrer und Datum auswählen!");
       return;
     }
     try {
-      const t = await api.createTour(Number(fahrerId), datum);
+      const t = await api.createTour(selectedFahrer, datum);
       setTour(t);
       setStopps([]);
       setMsg("✅ Tour angelegt");
-    } catch {
-      setMsg("❌ Fehler beim Anlegen der Tour");
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Tour konnte nicht angelegt werden");
     }
-  };
+  }
 
-  // Tour laden
-  const loadTour = async () => {
-    setMsg("");
-    if (!fahrerId || !datum) {
-      setMsg("⚠️ Fahrer & Datum wählen");
+  async function ladeTour() {
+    if (!selectedFahrer || !datum) {
+      alert("Bitte Fahrer und Datum auswählen!");
       return;
     }
-    setLoading(true);
     try {
-      const data = await api.getTour(Number(fahrerId), datum);
+      const data = await api.getTour(selectedFahrer, datum);
       setTour(data.tour);
-      setStopps((data.stopps || []).slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
-      if (!data.tour) {
-        setMsg("ℹ️ Keine Tour vorhanden");
-      } else {
-        setMsg("✅ Tour geladen");
-      }
-    } catch {
-      setMsg("❌ Fehler beim Laden der Tour");
-    } finally {
-      setLoading(false);
+      setStopps(data.stopps || []);
+      setMsg(data.tour ? "✅ Tour geladen" : "ℹ️ Keine Tour vorhanden");
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Tour konnte nicht geladen werden");
     }
-  };
+  }
 
-  // Stopp hinzufügen
-  const addStopp = async () => {
-    setMsg("");
+  // ---- STOPPS ----
+  async function addStopp() {
     if (!tour?.id) {
-      setMsg("⚠️ Bitte zuerst Tour anlegen oder laden");
+      alert("Bitte zuerst eine Tour anlegen oder laden!");
       return;
     }
-    if (!neu.kunde.trim() || !neu.adresse.trim()) {
-      setMsg("⚠️ Kunde & Adresse erforderlich");
+    const payload = { ...neuStopp };
+    if (!payload.kunde || !payload.adresse) {
+      alert("Bitte mindestens Kunde und Adresse eingeben!");
       return;
     }
     try {
-      const s = await api.addStopp(tour.id, {
-        kunde: neu.kunde.trim(),
-        adresse: neu.adresse.trim(),
-        telefon: neu.telefon.trim(),
-        kommission: neu.kommission.trim(),
-        hinweis: neu.hinweis.trim(),
-        position: Number(neu.position) || 0,
+      const s = await api.createStopp(tour.id, payload);
+      setStopps([...stopps, s]);
+      setNeuStopp({
+        kunde: "",
+        adresse: "",
+        telefon: "",
+        kommission: "",
+        hinweis: "",
+        position: "",
       });
-      setStopps((prev) => [...prev, s].sort((a, b) => (a.position ?? 0) - (b.position ?? 0)));
-      setNeu({ kunde: "", adresse: "", telefon: "", kommission: "", hinweis: "", position: 0 });
       setMsg("✅ Stopp hinzugefügt");
-    } catch {
-      setMsg("❌ Fehler beim Hinzufügen des Stopps");
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Stopp konnte nicht angelegt werden");
     }
-  };
+  }
 
-  // Stopp löschen
-  const deleteStopp = async (id) => {
-    if (!window.confirm("Diesen Stopp löschen?")) return;
+  async function deleteStopp(id) {
+    if (!window.confirm("Diesen Stopp wirklich löschen?")) return;
     try {
       await api.deleteStopp(id);
-      setStopps((prev) => prev.filter((s) => s.id !== id));
-      setMsg("🗑️ Stopp gelöscht");
-    } catch {
-      setMsg("❌ Fehler beim Löschen des Stopps");
+      setStopps(stopps.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error("Fehler:", err);
+      setMsg("❌ Stopp konnte nicht gelöscht werden");
     }
-  };
+  }
 
-  // Foto-Upload
-  const onFotoSelected = async (stoppId, file) => {
-    if (!file) return;
-    setMsg("");
-    try {
-      const updated = await api.uploadStoppFoto(stoppId, file);
-      setStopps((prev) => prev.map((s) => (s.id === stoppId ? updated : s)));
-      setMsg("📷 Foto gespeichert");
-    } catch {
-      setMsg("❌ Fehler beim Foto-Upload");
-    }
-  };
-
-  const removeFoto = async (stoppId) => {
-    if (!window.confirm("Foto wirklich löschen?")) return;
-    setMsg("");
-    try {
-      const updated = await api.deleteStoppFoto(stoppId);
-      setStopps((prev) => prev.map((s) => (s.id === stoppId ? updated : s)));
-      setMsg("🗑️ Foto gelöscht");
-    } catch {
-      setMsg("❌ Fehler beim Foto-Löschen");
-    }
-  };
-
-  // === JSX ===
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-[#0058A3]">Planung</h1>
+      <h1 className="text-2xl font-semibold text-[#0058A3]">Tourenplanung</h1>
 
-      {/* Fahrer bearbeiten */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h2 className="text-lg font-semibold text-[#0058A3] mb-3">👤 Fahrer bearbeiten</h2>
-        <div className="flex gap-3 mb-4">
-          <input
-            className="border rounded-md px-3 py-2 flex-1"
-            placeholder="Neuer Fahrername"
-            value={neuerFahrer}
-            onChange={(e) => setNeuerFahrer(e.target.value)}
-          />
+      {/* Fahrer-Auswahl */}
+      <section className="bg-white p-4 rounded-lg shadow space-y-3">
+        <h2 className="text-lg font-medium text-[#0058A3]">Fahrer</h2>
+        {msg && <div className="text-sm text-gray-600">{msg}</div>}
+
+        <div className="flex flex-wrap gap-2">
+          <select
+            className="border rounded-md px-3 py-2"
+            value={selectedFahrer}
+            onChange={(e) => setSelectedFahrer(e.target.value)}
+          >
+            <option value="">– Fahrer auswählen –</option>
+            {fahrer.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name}
+              </option>
+            ))}
+          </select>
+
           <button
             onClick={addFahrer}
-            className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition"
+            className="bg-[#0058A3] text-white px-3 py-2 rounded-md hover:bg-blue-800"
           >
-            ➕ Fahrer hinzufügen
+            + Fahrer
           </button>
         </div>
 
-        {fahrer.length === 0 ? (
-          <p className="text-sm text-gray-500">Keine Fahrer vorhanden.</p>
-        ) : (
-          <table className="min-w-full text-sm border">
-            <thead>
-              <tr className="bg-[#0058A3] text-white">
-                <th className="px-3 py-2 text-left">Name</th>
-                <th className="px-3 py-2 text-left">Aktionen</th>
+        <div className="mt-3">
+          {fahrer.map((f) => (
+            <span
+              key={f.id}
+              className="inline-flex items-center bg-gray-100 px-2 py-1 rounded mr-2 mb-2"
+            >
+              {f.name}
+              <button
+                onClick={() => deleteFahrer(f.id)}
+                className="ml-2 text-red-600 hover:text-red-800"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      </section>
+
+      {/* Tour */}
+      <section className="bg-white p-4 rounded-lg shadow space-y-3">
+        <h2 className="text-lg font-medium text-[#0058A3]">Tour</h2>
+        <div className="flex flex-wrap gap-3 items-end">
+          <div>
+            <label className="text-sm text-gray-600 block">Datum</label>
+            <input
+              type="date"
+              className="border rounded-md px-3 py-2"
+              value={datum}
+              onChange={(e) => setDatum(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={anlegenTour}
+            className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800"
+          >
+            Tour anlegen
+          </button>
+          <button
+            onClick={ladeTour}
+            className="bg-gray-200 px-4 py-2 rounded-md hover:bg-gray-300"
+          >
+            Tour laden
+          </button>
+        </div>
+
+        {tour && (
+          <div className="mt-4 text-sm text-gray-700">
+            <div>
+              <b>Tour-ID:</b> {tour.id}
+            </div>
+            <div>
+              <b>Fahrer-ID:</b> {tour.fahrer_id}
+            </div>
+            <div>
+              <b>Datum:</b> {tour.datum}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* Stopps */}
+      {tour && (
+        <section className="bg-white p-4 rounded-lg shadow space-y-4">
+          <h2 className="text-lg font-medium text-[#0058A3]">
+            Stopps der Tour
+          </h2>
+
+          {/* Tabelle */}
+          <table className="min-w-full border text-sm">
+            <thead className="bg-[#0058A3] text-white">
+              <tr>
+                <th className="border px-2 py-1">Pos</th>
+                <th className="border px-2 py-1">Kunde</th>
+                <th className="border px-2 py-1">Adresse</th>
+                <th className="border px-2 py-1">Telefon</th>
+                <th className="border px-2 py-1">Kommission</th>
+                <th className="border px-2 py-1">Hinweis</th>
+                <th className="border px-2 py-1">Aktionen</th>
               </tr>
             </thead>
             <tbody>
-              {fahrer.map((f) => (
-                <tr key={f.id} className="odd:bg-gray-50">
-                  <td className="px-3 py-2">{f.name}</td>
-                  <td className="px-3 py-2">
+              {stopps.length === 0 && (
+                <tr>
+                  <td
+                    colSpan="7"
+                    className="text-center py-2 text-gray-500 italic"
+                  >
+                    Keine Stopps vorhanden
+                  </td>
+                </tr>
+              )}
+              {stopps.map((s) => (
+                <tr key={s.id} className="hover:bg-gray-50">
+                  <td className="border px-2 py-1 text-center">{s.position}</td>
+                  <td className="border px-2 py-1">{s.kunde}</td>
+                  <td className="border px-2 py-1">{s.adresse}</td>
+                  <td className="border px-2 py-1">{s.telefon}</td>
+                  <td className="border px-2 py-1">{s.kommission}</td>
+                  <td className="border px-2 py-1">{s.hinweis}</td>
+                  <td className="border px-2 py-1 text-center">
                     <button
-                      onClick={() => deleteFahrer(f.id)}
-                      className="text-red-600 hover:underline"
+                      onClick={() => deleteStopp(s.id)}
+                      className="text-red-600 hover:text-red-800"
                     >
-                      🗑️ Löschen
+                      🗑️
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </div>
 
-      {/* Tour planen / laden */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h2 className="text-lg font-semibold text-[#0058A3] mb-3">🗓️ Tour planen</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="text-sm text-gray-600">Fahrer</label>
-            <select
-              value={fahrerId}
-              onChange={(e) => setFahrerId(e.target.value)}
-              className="mt-1 border rounded-md px-3 py-2 w-full"
+          {/* Formular Neuer Stopp */}
+          <div className="border-t pt-4">
+            <h3 className="text-md font-semibold mb-2 text-[#0058A3]">
+              + Neuen Stopp hinzufügen
+            </h3>
+
+            <div className="grid md:grid-cols-3 gap-3">
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Kunde"
+                value={neuStopp.kunde}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, kunde: e.target.value })
+                }
+              />
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Adresse"
+                value={neuStopp.adresse}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, adresse: e.target.value })
+                }
+              />
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Telefon"
+                value={neuStopp.telefon}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, telefon: e.target.value })
+                }
+              />
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Kommission"
+                value={neuStopp.kommission}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, kommission: e.target.value })
+                }
+              />
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Hinweis"
+                value={neuStopp.hinweis}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, hinweis: e.target.value })
+                }
+              />
+              <input
+                className="border rounded-md px-3 py-2"
+                placeholder="Position (z. B. 1, 2, 3)"
+                value={neuStopp.position}
+                onChange={(e) =>
+                  setNeuStopp({ ...neuStopp, position: e.target.value })
+                }
+              />
+            </div>
+
+            <button
+              onClick={addStopp}
+              className="mt-3 bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800"
             >
-              <option value="">Fahrer wählen</option>
-              {fahrer.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
+              + Stopp hinzufügen
+            </button>
           </div>
-
-          <div>
-            <label className="text-sm text-gray-600">Datum</label>
-            <input
-              type="date"
-              value={datum}
-              onChange={(e) => setDatum(e.target.value)}
-              className="mt-1 border rounded-md px-3 py-2 w-full"
-            />
-          </div>
-
-          <button
-            onClick={createTour}
-            className="bg-[#0058A3] text-white px-4 py-2 rounded-md hover:bg-blue-800 transition"
-          >
-            Tour anlegen
-          </button>
-
-          <button
-            onClick={loadTour}
-            className="bg-gray-200 text-gray-800 px-4 py-2 rounded-md hover:bg-gray-300 transition"
-          >
-            Tour laden
-          </button>
-        </div>
-
-        {loading && <div className="mt-3 text-sm text-gray-600">⏳ Lade...</div>}
-        {tour && (
-          <div className="mt-3 text-sm text-gray-700">
-            <b>Tour-ID:</b> {tour.id} • <b>Fahrer:</b> {fahrerName} • <b>Datum:</b> {datum}
-          </div>
-        )}
-      </div>
-
-      {/* Stopps */}
-      <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
-        <h2 className="text-lg font-semibold text-[#0058A3] mb-3">📍 Stopps</h2>
-        {/* (Rest wie gehabt) */}
-      </div>
-
-      {msg && (
-        <div
-          className={`px-4 py-3 rounded-md text-sm ${
-            msg.startsWith("❌") || msg.startsWith("⚠️")
-              ? "bg-red-50 border border-red-300 text-red-700"
-              : "bg-green-50 border border-green-300 text-green-700"
-          }`}
-        >
-          {msg}
-        </div>
+        </section>
       )}
     </div>
   );
