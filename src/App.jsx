@@ -1,43 +1,38 @@
 import React from "react";
-import { NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { NavLink, Route, Routes, useNavigate } from "react-router-dom";
 import Planung from "./pages/Planung";
 import Tagestour from "./pages/Tagestour";
 import Uebersicht from "./pages/Uebersicht";
-import Tourverwaltung from "./pages/Tourverwaltung";
+import Tourverwaltung from "./pages/Tourverwaltung"; // wichtig, bleibt unverändert
 import Login from "./pages/Login";
 
-function useToken() {
-  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  return token && token.length > 10 ? token : null;
-}
-
-function ProtectedRoute({ children }) {
-  const token = useToken();
-  const location = useLocation();
-  if (!token) {
-    return <Navigate to="/login" replace state={{ from: location }} />;
-  }
-  return children;
-}
-
 function Layout({ children }) {
-  const token = useToken();
-  const location = useLocation();
-  const onLoginPage = location.pathname === "/login";
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    navigate("/login");
+  }
+
+  const hasToken = !!localStorage.getItem("token");
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Header nicht auf der Login-Seite */}
-      {!onLoginPage && (
-        <header className="bg-white shadow">
-          <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
-            <div className="text-xl font-semibold text-[#0058A3]">Tourenplan</div>
+      <header className="bg-white shadow">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
+          <div className="text-xl font-semibold text-[#0058A3]">Tourenplan</div>
+
+          {hasToken && (
             <nav className="flex gap-2">
               <NavLink
                 to="/"
                 end
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                  `px-3 py-2 rounded-md ${
+                    isActive
+                      ? "bg-[#0058A3] text-white"
+                      : "hover:bg-gray-100 text-gray-700"
+                  }`
                 }
               >
                 Planung
@@ -45,7 +40,11 @@ function Layout({ children }) {
               <NavLink
                 to="/tagestour"
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                  `px-3 py-2 rounded-md ${
+                    isActive
+                      ? "bg-[#0058A3] text-white"
+                      : "hover:bg-gray-100 text-gray-700"
+                  }`
                 }
               >
                 Tagestour
@@ -53,7 +52,11 @@ function Layout({ children }) {
               <NavLink
                 to="/gesamtuebersicht"
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                  `px-3 py-2 rounded-md ${
+                    isActive
+                      ? "bg-[#0058A3] text-white"
+                      : "hover:bg-gray-100 text-gray-700"
+                  }`
                 }
               >
                 Gesamtübersicht
@@ -61,80 +64,53 @@ function Layout({ children }) {
               <NavLink
                 to="/tourverwaltung"
                 className={({ isActive }) =>
-                  `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                  `px-3 py-2 rounded-md ${
+                    isActive
+                      ? "bg-[#0058A3] text-white"
+                      : "hover:bg-gray-100 text-gray-700"
+                  }`
                 }
               >
                 Tourverwaltung
               </NavLink>
             </nav>
-            <div className="ml-auto" />
-            {token ? <LogoutButton /> : null}
-          </div>
-        </header>
-      )}
-      <main className={onLoginPage ? "" : "max-w-6xl mx-auto px-4 py-6"}>{children}</main>
+          )}
+
+          <div className="ml-auto" />
+
+          {hasToken && (
+            <button
+              onClick={handleLogout}
+              className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300 transition"
+            >
+              Logout
+            </button>
+          )}
+        </div>
+      </header>
+
+      <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
     </div>
   );
 }
 
-function LogoutButton() {
-  function doLogout() {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-  }
-  return (
-    <button
-      onClick={doLogout}
-      className="text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300"
-    >
-      Logout
-    </button>
-  );
-}
-
 export default function App() {
+  const hasToken = !!localStorage.getItem("token");
+
   return (
     <Layout>
       <Routes>
-        {/* Login ist die einzige ungeschützte Route */}
-        <Route path="/login" element={<Login />} />
-
-        {/* Geschützte Bereiche */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Planung />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tagestour"
-          element={
-            <ProtectedRoute>
-              <Tagestour />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/gesamtuebersicht"
-          element={
-            <ProtectedRoute>
-              <Uebersicht />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/tourverwaltung"
-          element={
-            <ProtectedRoute>
-              <Tourverwaltung />
-            </ProtectedRoute>
-          }
-        />
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {!hasToken ? (
+          <Route path="*" element={<Login />} />
+        ) : (
+          <>
+            <Route path="/" element={<Planung />} />
+            <Route path="/tagestour" element={<Tagestour />} />
+            <Route path="/gesamtuebersicht" element={<Uebersicht />} />
+            <Route path="/tourverwaltung" element={<Tourverwaltung />} />
+            <Route path="/login" element={<Login />} />
+          </>
+        )}
       </Routes>
     </Layout>
   );
