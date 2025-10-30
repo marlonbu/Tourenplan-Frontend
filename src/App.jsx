@@ -3,6 +3,7 @@ import { NavLink, Route, Routes } from "react-router-dom";
 import Planung from "./pages/Planung";
 import Tagestour from "./pages/Tagestour";
 import Uebersicht from "./pages/Uebersicht";
+import Tourverwaltung from "./pages/Tourverwaltung"; // ⬅️ Neu hinzugefügt
 
 function Layout({ children }) {
   return (
@@ -15,7 +16,9 @@ function Layout({ children }) {
               to="/"
               end
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                `px-3 py-2 rounded-md ${
+                  isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"
+                }`
               }
             >
               Planung
@@ -23,7 +26,9 @@ function Layout({ children }) {
             <NavLink
               to="/tagestour"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                `px-3 py-2 rounded-md ${
+                  isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"
+                }`
               }
             >
               Tagestour
@@ -31,10 +36,22 @@ function Layout({ children }) {
             <NavLink
               to="/gesamtuebersicht"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md ${isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"}`
+                `px-3 py-2 rounded-md ${
+                  isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"
+                }`
               }
             >
               Gesamtübersicht
+            </NavLink>
+            <NavLink
+              to="/tourverwaltung"
+              className={({ isActive }) =>
+                `px-3 py-2 rounded-md ${
+                  isActive ? "bg-[#0058A3] text-white" : "hover:bg-gray-100"
+                }`
+              }
+            >
+              Tourverwaltung
             </NavLink>
           </nav>
           <div className="ml-auto" />
@@ -69,6 +86,7 @@ export default function App() {
         <Route path="/" element={<Planung />} />
         <Route path="/tagestour" element={<Tagestour />} />
         <Route path="/gesamtuebersicht" element={<Uebersicht />} />
+        <Route path="/tourverwaltung" element={<Tourverwaltung />} /> {/* ⬅️ Neu */}
       </Routes>
     </Layout>
   );
