@@ -58,15 +58,14 @@ const Layout = ({ children }) => {
 export default function App() {
   const token = localStorage.getItem("token");
 
-  // Kein Token -> Loginseite
   if (!token) {
     return (
       <div className="min-h-screen grid place-items-center bg-gray-50">
         <div className="bg-white p-6 rounded-lg shadow w-full max-w-sm">
           <h1 className="text-xl font-semibold text-[#0058A3] mb-4">Login</h1>
           <p className="text-sm text-gray-600 mb-4">
-            Entweder direkt ein JWT einfügen <b>(API‑Token)</b> oder mit
-            Benutzer <b>Gehlenborg</b> und Passwort <b>Orga1023/</b> anmelden.
+            Entweder direkt ein JWT einfügen <b>(API‑Token)</b> oder mit Benutzer{" "}
+            <b>Gehlenborg</b> und Passwort <b>Orga1023/</b> anmelden.
           </p>
           <LoginForm />
         </div>
@@ -74,7 +73,6 @@ export default function App() {
     );
   }
 
-  // Mit Token -> App
   return (
     <Layout>
       <Routes>
@@ -101,20 +99,24 @@ function LoginForm() {
     setMsg("");
 
     try {
-      // 1) Manuell eingefügtes Token akzeptieren
+      // 1) Manuelles Token erlauben (JWT oder Legacy "Gehlenborg")
       if (token.trim()) {
         localStorage.setItem("token", token.trim());
         window.location.reload();
         return;
       }
 
-      // 2) Login gegen Backend
+      // 2) Login gegen Backend (/login → { token })
       const res = await fetch(`${API_BASE}/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      if (!res.ok) throw new Error("Login fehlgeschlagen");
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`Login fehlgeschlagen (${res.status}) ${text}`);
+      }
       const data = await res.json();
       if (!data.token) throw new Error("Kein Token erhalten");
 
@@ -122,7 +124,7 @@ function LoginForm() {
       window.location.reload();
     } catch (err) {
       console.error("[Login] Fehler:", err);
-      setMsg("❌ Login fehlgeschlagen");
+      setMsg(`❌ ${err.message || "Login fehlgeschlagen"}`);
     }
   };
 
@@ -136,7 +138,7 @@ function LoginForm() {
         <label className="text-sm text-gray-600">API‑Token (optional)</label>
         <input
           className="mt-1 border rounded-md px-3 py-2 w-full"
-          placeholder="JWT hier einfügen"
+          placeholder='JWT (beginnt mit "eyJ") oder Legacy "Gehlenborg"'
           value={token}
           onChange={(e) => setToken(e.target.value)}
         />
@@ -170,7 +172,21 @@ function LoginForm() {
         Anmelden
       </button>
 
-      {msg && <div className="text-sm text-red-600">{msg}</div>}
+      {msg && (
+        <div className="text-sm text-red-600 space-y-2">
+          <div>{msg}</div>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.setItem("token", "Gehlenborg"); // Legacy-Fallback
+              window.location.reload();
+            }}
+            className="underline text-red-700"
+          >
+            Dev‑Bypass: Legacy‑Token „Gehlenborg“ setzen
+          </button>
+        </div>
+      )}
     </form>
   );
 }
